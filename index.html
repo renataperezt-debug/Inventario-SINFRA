@@ -2118,6 +2118,11 @@ function saveState(opts){
       }
     } catch(e){ console.warn('sync push failed', e); }
   }
+  // === SUPABASE SYNC HOOK ===
+  // Push any new movements/materials/reservations to Supabase
+  if(!opts.skipSync && typeof window.sbHookSaveState === 'function'){
+    try { window.sbHookSaveState(); } catch(e){ console.warn('[SB] hook:', e.message); }
+  }
 }
 
 // ---------- UTIL ----------
@@ -7648,51 +7653,55 @@ async function sbSeedFromLocal(){
 }
 
 //==================================================================
-// HOOK INTO LOCAL OPERATIONS (saveState, etc.)
+// HOOK INTO LOCAL OPERATIONS
+// saveState() calls window.sbHookSaveState() after every save
 //==================================================================
-// Wrap the existing saveState to also push to Supabase when changes happen
-const _origSaveState = window.saveState;
-if(typeof _origSaveState === 'function'){
-  window.saveState = function(opts){
-    opts = opts || {};
-    const result = _origSaveState.call(this, opts);
-    if(!opts.skipSync && sbClient && sbInitialLoadDone){
-      sbSyncRecentChanges();
-    }
-    return result;
-  };
-}
 
-// Track last-seen counts to detect what's new
-let sbLastMatCount = 0;
-let sbLastMovCount = 0;
-let sbLastRsvCount = 0;
-function sbSyncRecentChanges(){
-  // Push any new materials
-  for(let i = sbLastMatCount; i < state.materials.length; i++){
-    sbPushMaterial(state.materials[i]);
+// Track last-seen IDs (not lengths) — more robust to deletions/reorderings
+let sbLastMatId = 0;
+let sbLastMovId = 0;
+const sbKnownRsvIds = new Set();
+let sbHookEnabled = false;
+
+window.sbHookSaveState = function(){
+  if(!sbHookEnabled || !sbClient) return;
+
+  // Push any new materials (id > lastSeenMatId)
+  const newMats = state.materials.filter(m => m.id > sbLastMatId);
+  if(newMats.length){
+    newMats.forEach(m => sbPushMaterial(m));
+    sbLastMatId = Math.max(sbLastMatId, ...newMats.map(m=>m.id));
   }
-  // Push any new movements
-  for(let i = sbLastMovCount; i < state.movements.length; i++){
-    sbPushMovement(state.movements[i]);
+
+  // Push any new movements (id > lastSeenMovId)
+  const newMovs = state.movements.filter(m => m.id > sbLastMovId);
+  if(newMovs.length){
+    newMovs.forEach(m => sbPushMovement(m));
+    sbLastMovId = Math.max(sbLastMovId, ...newMovs.map(m=>m.id));
   }
-  // Push reservation changes (simpler: push all current ones that have changed since last save)
+
+  // Push reservations: any new ones, plus push existing if state changed
   if(Array.isArray(state.reservations)){
-    for(let i = sbLastRsvCount; i < state.reservations.length; i++){
-      sbPushReservation(state.reservations[i]);
-    }
-    sbLastRsvCount = state.reservations.length;
+    state.reservations.forEach(r => {
+      if(!sbKnownRsvIds.has(r.id)){
+        sbPushReservation(r);
+        sbKnownRsvIds.add(r.id);
+      }
+    });
+    // Also push reservations whose state may have changed (fulfilled, cancelled)
+    // Simple approach: push all current reservations on every save (cheap with upsert)
+    // To avoid spam, only do this when the reservation count or last-modified differs
+    state.reservations.forEach(r => {
+      if(r._dirty){ sbPushReservation(r); r._dirty = false; }
+    });
   }
-  sbLastMatCount = state.materials.length;
-  sbLastMovCount = state.movements.length;
-}
+};
 
-// Also push when materials get edited in place (which doesn't increase the array length)
-// We expose a helper that the rest of the app can call
-window.sbSyncMaterial = sbPushMaterial;
-window.sbSyncMovement = sbPushMovement;
-window.sbSyncReservation = sbPushReservation;
-window.sbDeleteReservation = sbDeleteReservation;
+// Helper that the rest of the app can call directly to force a push
+window.sbSyncMaterial = function(m){ if(sbClient) sbPushMaterial(m); };
+window.sbSyncMovement = function(mv){ if(sbClient) sbPushMovement(mv); };
+window.sbSyncReservation = function(r){ if(sbClient) sbPushReservation(r); };
+window.sbSyncDeleteReservation = function(rid){ if(sbClient) sbDeleteReservation(rid); };
 
 //==================================================================
 // CONFIG TAB: Add status badge & seed button
@@ -7759,12 +7768,15 @@ function sbInit(){
     sbInjectConfigUI();
     sbSetStatus('connecting');
 
-    // Track baseline counts AFTER initial load
+    // Track baseline IDs AFTER initial load, then enable the hook
     sbInitialLoad().then(()=>{
-      sbLastMatCount = state.materials.length;
-      sbLastMovCount = state.movements.length;
-      sbLastRsvCount = (state.reservations||[]).length;
+      sbLastMatId = state.materials.reduce((mx,m)=>Math.max(mx, m.id||0), 0);
+      sbLastMovId = state.movements.reduce((mx,m)=>Math.max(mx, m.id||0), 0);
+      sbKnownRsvIds.clear();
+      (state.reservations||[]).forEach(r => sbKnownRsvIds.add(r.id));
+      sbHookEnabled = true;
       sbSubscribeRealtime();
+      console.log(`[SB] Hook activated. Baseline: matId=${sbLastMatId}, movId=${sbLastMovId}, rsvIds=${sbKnownRsvIds.size}`);
     });
 
     // Online/offline detection
