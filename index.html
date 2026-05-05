@@ -7461,9 +7461,26 @@ async function sbPushReservation(r){
 async function sbDeleteReservation(rid){
   if(!sbClient) return;
   try {
+    sbMarkPushed('reservations', rid);
     const { error } = await sbClient.from('inv_reservations').delete().eq('client_id', rid);
     if(error) console.warn('[SB] delete reservation:', error.message);
   } catch(e){ console.warn('[SB] delete exception:', e.message); }
+}
+async function sbDeleteMovement(mid){
+  if(!sbClient) return;
+  try {
+    sbMarkPushed('movements', mid);
+    const { error } = await sbClient.from('inv_movements').delete().eq('client_id', mid);
+    if(error) console.warn('[SB] delete movement:', error.message);
+  } catch(e){ console.warn('[SB] delete movement exception:', e.message); }
+}
+async function sbDeleteMaterial(mid){
+  if(!sbClient) return;
+  try {
+    sbMarkPushed('materials', mid);
+    const { error } = await sbClient.from('inv_materials').delete().eq('client_id', mid);
+    if(error) console.warn('[SB] delete material:', error.message);
+  } catch(e){ console.warn('[SB] delete material exception:', e.message); }
 }
 
 //==================================================================
@@ -7544,11 +7561,13 @@ function sbSubscribeRealtime(){
 
       if(payload.eventType === 'DELETE'){
         state.materials = state.materials.filter(m=>m.id !== newRow.client_id);
+        sbMatSnapshot.delete(newRow.client_id);
       } else {
         const mat = sbRowToMaterial(payload.new);
         const idx = state.materials.findIndex(m=>m.id === mat.id);
         if(idx >= 0) state.materials[idx] = mat;
         else state.materials.push(mat);
+        sbMatSnapshot.set(mat.id, sbMatSig(mat));
       }
       saveState({ skipSync:true });
       sbScheduleRefresh();
@@ -7566,12 +7585,14 @@ function sbSubscribeRealtime(){
 
       if(payload.eventType === 'DELETE'){
         state.movements = state.movements.filter(m=>m.id !== newRow.client_id);
+        sbMovSnapshot.delete(newRow.client_id);
       } else {
         const mv = sbRowToMovement(payload.new);
         const idx = state.movements.findIndex(m=>m.id === mv.id);
         if(idx >= 0) state.movements[idx] = mv;
         else state.movements.push(mv);
         if(mv.id >= state.nextMovId) state.nextMovId = mv.id + 1;
+        sbMovSnapshot.set(mv.id, sbMovSig(mv));
       }
       saveState({ skipSync:true });
       sbScheduleRefresh();
@@ -7589,12 +7610,14 @@ function sbSubscribeRealtime(){
 
       if(payload.eventType === 'DELETE'){
         state.reservations = (state.reservations||[]).filter(r=>r.id !== newRow.client_id);
+        sbRsvSnapshot.delete(newRow.client_id);
       } else {
         const r = sbRowToReservation(payload.new);
         if(!Array.isArray(state.reservations)) state.reservations = [];
         const idx = state.reservations.findIndex(x=>x.id === r.id);
         if(idx >= 0) state.reservations[idx] = r;
         else state.reservations.push(r);
+        sbRsvSnapshot.set(r.id, sbRsvSig(r));
       }
       saveState({ skipSync:true });
       sbScheduleRefresh();
@@ -7691,9 +7714,13 @@ async function sbSeedFromLocal(){
     // Resume realtime and re-enable hook
     sbHookEnabled = prevHookEnabled;
     await sbResumeRealtime();
-    // Update baseline so we don't re-push everything we just sent
-    sbLastMatId = state.materials.reduce((mx,m)=>Math.max(mx, m.id||0), 0);
-    sbLastMovId = state.movements.reduce((mx,m)=>Math.max(mx, m.id||0), 0);
+    // Update baseline snapshots so we don't re-push everything we just sent
+    sbMatSnapshot.clear();
+    sbMovSnapshot.clear();
+    sbRsvSnapshot.clear();
+    state.materials.forEach(m => sbMatSnapshot.set(m.id, sbMatSig(m)));
+    state.movements.forEach(mv => sbMovSnapshot.set(mv.id, sbMovSig(mv)));
+    (state.reservations||[]).forEach(r => sbRsvSnapshot.set(r.id, sbRsvSig(r)));
   }
 }
 
@@ -7718,49 +7745,104 @@ async function sbResumeRealtime(){
 //==================================================================
 // HOOK INTO LOCAL OPERATIONS
 // saveState() calls window.sbHookSaveState() after every save
+// Tracks snapshots to detect: NEW items, DELETED items, and CHANGED items
 //==================================================================
 
-// Track last-seen IDs (not lengths) — more robust to deletions/reorderings
-let sbLastMatId = 0;
-let sbLastMovId = 0;
-const sbKnownRsvIds = new Set();
+// Snapshot maps: id -> JSON-serialized version of last-known state
+const sbMatSnapshot = new Map(); // matId -> JSON
+const sbMovSnapshot = new Map(); // movId -> JSON
+const sbRsvSnapshot = new Map(); // rsvId -> JSON
 let sbHookEnabled = false;
+
+// Build a stable signature for change detection (only fields that go to Supabase)
+function sbMatSig(m){
+  return JSON.stringify({
+    c: m.clasif||null, m: m.material||'', s: m.sap==null?null:String(m.sap),
+    cr: m.critico||'ok', sk: Number(m.stock?.KM15)||0, sr: Number(m.stock?.Reactivos)||0,
+    sn: Number(m.stock?.Nivel17)||0, sv: Number(m.stock?.Ventiladores)||0,
+    sp: m.specs||null,
+  });
+}
+function sbMovSig(mv){
+  return JSON.stringify({
+    t: mv.type, mi: mv.matId||null, q: Number(mv.qty)||0, a: mv.area||null,
+    d: mv.date||null, ts: mv.timestamp||null, u: mv.user||null, r: mv.resp||null,
+    do: mv.doc||null, de: mv.destino||null, ot: mv.ot||null, ac: mv.activity||null,
+    n: mv.notes||null,
+  });
+}
+function sbRsvSig(r){
+  return JSON.stringify({
+    mi: r.matId||null, a: r.area||null, q: Number(r.qty)||0,
+    rb: r.requestedBy||null, rf: r.requestedFor||null, dd: r.dueDate||null,
+    st: r.status||r.state||null, n: r.notes||null,
+    fa: r.fulfilledAt||null, ca: r.cancelledAt||null,
+  });
+}
 
 window.sbHookSaveState = function(){
   if(!sbHookEnabled || !sbClient) return;
 
-  // Push any new materials (id > lastSeenMatId)
-  const newMats = state.materials.filter(m => m.id > sbLastMatId);
-  if(newMats.length){
-    newMats.forEach(m => sbPushMaterial(m));
-    sbLastMatId = Math.max(sbLastMatId, ...newMats.map(m=>m.id));
+  // ===== MATERIALS =====
+  const currentMatIds = new Set();
+  state.materials.forEach(m => {
+    currentMatIds.add(m.id);
+    const sig = sbMatSig(m);
+    const prev = sbMatSnapshot.get(m.id);
+    if(prev !== sig){
+      sbPushMaterial(m);
+      sbMatSnapshot.set(m.id, sig);
+    }
+  });
+  // Detect deleted materials
+  for(const id of [...sbMatSnapshot.keys()]){
+    if(!currentMatIds.has(id)){
+      sbDeleteMaterial(id);
+      sbMatSnapshot.delete(id);
+    }
   }
 
-  // Push any new movements (id > lastSeenMovId)
-  const newMovs = state.movements.filter(m => m.id > sbLastMovId);
-  if(newMovs.length){
-    newMovs.forEach(m => sbPushMovement(m));
-    sbLastMovId = Math.max(sbLastMovId, ...newMovs.map(m=>m.id));
+  // ===== MOVEMENTS =====
+  const currentMovIds = new Set();
+  state.movements.forEach(mv => {
+    currentMovIds.add(mv.id);
+    const sig = sbMovSig(mv);
+    const prev = sbMovSnapshot.get(mv.id);
+    if(prev !== sig){
+      sbPushMovement(mv);
+      sbMovSnapshot.set(mv.id, sig);
+    }
+  });
+  // Detect deleted movements (this is the bug we're fixing)
+  for(const id of [...sbMovSnapshot.keys()]){
+    if(!currentMovIds.has(id)){
+      sbDeleteMovement(id);
+      sbMovSnapshot.delete(id);
+    }
   }
 
-  // Push reservations: any new ones, plus push existing if state changed
+  // ===== RESERVATIONS =====
   if(Array.isArray(state.reservations)){
+    const currentRsvIds = new Set();
     state.reservations.forEach(r => {
-      if(!sbKnownRsvIds.has(r.id)){
+      currentRsvIds.add(r.id);
+      const sig = sbRsvSig(r);
+      const prev = sbRsvSnapshot.get(r.id);
+      if(prev !== sig){
         sbPushReservation(r);
-        sbKnownRsvIds.add(r.id);
+        sbRsvSnapshot.set(r.id, sig);
       }
     });
-    // Also push reservations whose state may have changed (fulfilled, cancelled)
-    // Simple approach: push all current reservations on every save (cheap with upsert)
-    // To avoid spam, only do this when the reservation count or last-modified differs
-    state.reservations.forEach(r => {
-      if(r._dirty){ sbPushReservation(r); r._dirty = false; }
-    });
+    for(const id of [...sbRsvSnapshot.keys()]){
+      if(!currentRsvIds.has(id)){
+        sbDeleteReservation(id);
+        sbRsvSnapshot.delete(id);
+      }
+    }
   }
 };
 
-// Helper that the rest of the app can call directly to force a push
+// Helpers exposed for the rest of the app to call directly
 window.sbSyncMaterial = function(m){ if(sbClient) sbPushMaterial(m); };
 window.sbSyncMovement = function(mv){ if(sbClient) sbPushMovement(mv); };
 window.sbSyncReservation = function(r){ if(sbClient) sbPushReservation(r); };
@@ -7831,15 +7913,17 @@ function sbInit(){
     sbInjectConfigUI();
     sbSetStatus('connecting');
 
-    // Track baseline IDs AFTER initial load, then enable the hook
+    // After initial load: build baseline snapshots, then enable hook
     sbInitialLoad().then(()=>{
-      sbLastMatId = state.materials.reduce((mx,m)=>Math.max(mx, m.id||0), 0);
-      sbLastMovId = state.movements.reduce((mx,m)=>Math.max(mx, m.id||0), 0);
-      sbKnownRsvIds.clear();
-      (state.reservations||[]).forEach(r => sbKnownRsvIds.add(r.id));
+      sbMatSnapshot.clear();
+      sbMovSnapshot.clear();
+      sbRsvSnapshot.clear();
+      state.materials.forEach(m => sbMatSnapshot.set(m.id, sbMatSig(m)));
+      state.movements.forEach(mv => sbMovSnapshot.set(mv.id, sbMovSig(mv)));
+      (state.reservations||[]).forEach(r => sbRsvSnapshot.set(r.id, sbRsvSig(r)));
       sbHookEnabled = true;
       sbSubscribeRealtime();
-      console.log(`[SB] Hook activated. Baseline: matId=${sbLastMatId}, movId=${sbLastMovId}, rsvIds=${sbKnownRsvIds.size}`);
+      console.log(`[SB] Hook activated. Snapshots: ${sbMatSnapshot.size} mats, ${sbMovSnapshot.size} movs, ${sbRsvSnapshot.size} rsvs`);
     });
 
     // Online/offline detection
