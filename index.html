@@ -7265,8 +7265,8 @@ window.chatUpdateProviderUI = chatUpdateProviderUI;
 //==================================================================
 'use strict';
 
-const SB_URL  = 'https://qmmyvjqeoziitxpgvdji.supabase.co';
-const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtbXl2anFlb3ppaXR4cGd2ZGppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NDg2MTUsImV4cCI6MjA5MzUyNDYxNX0.kI1tKK03vMsjzWtDjbbX_wLul0GDYSaZkbtfJAdZv54';
+const SB_URL  = 'https://muhmahucokjzoamziuqi.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11aG1haHVjb2tqem9hbXppdXFpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NTI4MDMsImV4cCI6MjA5MzUyODgwM30.ay1Rlb2USJD9PoTXLlhvrVLy4tiNx3kN47vTynj-mAQ';
 
 const SB_DEVICE_ID = (function(){
   const k = 'sinfra_inv_device_id';
@@ -7474,11 +7474,12 @@ async function sbInitialLoad(){
   try {
     sbSetStatus('connecting');
 
-    // Materials (paged to avoid 1000-row limit)
+    // Materials (paged) — request only needed columns to save egress
+    const matCols = 'client_id,clasif,material,sap,critico,stock_km15,stock_reactivos,stock_nivel17,stock_ventiladores,specs';
     let allMats = [];
     let from = 0; const pageSize = 1000;
     while(true){
-      const { data, error } = await sbClient.from('inv_materials').select('*').order('client_id').range(from, from + pageSize - 1);
+      const { data, error } = await sbClient.from('inv_materials').select(matCols).order('client_id').range(from, from + pageSize - 1);
       if(error){ console.warn('[SB] load materials:', error.message); break; }
       if(!data || data.length === 0) break;
       allMats = allMats.concat(data);
@@ -7486,11 +7487,12 @@ async function sbInitialLoad(){
       from += pageSize;
     }
 
-    // Movements (paged)
+    // Movements (paged) — request only needed columns
+    const movCols = 'client_id,type,mat_id,sap,material,clasif,area,qty,date,ts,user_name,resp,doc,destino,ot,activity,notes,is_imported,is_adjustment';
     let allMovs = [];
     from = 0;
     while(true){
-      const { data, error } = await sbClient.from('inv_movements').select('*').order('client_id').range(from, from + pageSize - 1);
+      const { data, error } = await sbClient.from('inv_movements').select(movCols).order('client_id').range(from, from + pageSize - 1);
       if(error){ console.warn('[SB] load movements:', error.message); break; }
       if(!data || data.length === 0) break;
       allMovs = allMovs.concat(data);
@@ -7529,8 +7531,10 @@ async function sbInitialLoad(){
 //==================================================================
 function sbSubscribeRealtime(){
   if(!sbClient) return;
+  // Reset channel tracker
+  sbRealtimeChannels = [];
 
-  sbClient.channel('inv-materials-ch')
+  const matCh = sbClient.channel('inv-materials-ch')
     .on('postgres_changes', { event:'*', schema:'public', table:'inv_materials' }, (payload)=>{
       if(!sbInitialLoadDone) return;
       const newRow = payload.new || payload.old;
@@ -7550,9 +7554,10 @@ function sbSubscribeRealtime(){
       sbScheduleRefresh();
     })
     .subscribe();
+  sbRealtimeChannels.push(matCh);
 
-  sbClient.channel('inv-movements-ch')
-    .on('postgres_changes', { event:'*', schema:'public', table:'inv_movements' }, (payload)=>{
+  const movCh = sbClient.channel('inv-movements-ch')
+    .on('postgres_changes', { event:'*', schema:'public', table:'inv_movements', filter:`device_id=neq.${SB_DEVICE_ID}` }, (payload)=>{
       if(!sbInitialLoadDone) return;
       const newRow = payload.new || payload.old;
       if(!newRow || !newRow.client_id) return;
@@ -7572,8 +7577,9 @@ function sbSubscribeRealtime(){
       sbScheduleRefresh();
     })
     .subscribe();
+  sbRealtimeChannels.push(movCh);
 
-  sbClient.channel('inv-reservations-ch')
+  const rsvCh = sbClient.channel('inv-reservations-ch')
     .on('postgres_changes', { event:'*', schema:'public', table:'inv_reservations' }, (payload)=>{
       if(!sbInitialLoadDone) return;
       const newRow = payload.new || payload.old;
@@ -7594,6 +7600,7 @@ function sbSubscribeRealtime(){
       sbScheduleRefresh();
     })
     .subscribe();
+  sbRealtimeChannels.push(rsvCh);
 }
 
 // Debounced refresh: don't re-render too often when bulk changes arrive
@@ -7608,36 +7615,68 @@ function sbScheduleRefresh(){
 
 //==================================================================
 // SEED OPERATION (Configuración → "Sembrar Supabase")
+// CRITICAL: Disconnect realtime channels BEFORE seeding to avoid
+// broadcasting thousands of events that would burn the quota.
 //==================================================================
+let sbRealtimeChannels = []; // tracks active channels so we can pause them
+
 async function sbSeedFromLocal(){
   if(!sbClient){ alert('Supabase no está conectado.'); return; }
-  if(!confirm('Esto va a SUBIR todo el catálogo y movimientos locales a Supabase.\n\n• Materiales locales: '+state.materials.length+'\n• Movimientos locales: '+state.movements.length+'\n• Reservas locales: '+(state.reservations||[]).length+'\n\nSi Supabase ya tiene datos, los registros con el mismo ID se ACTUALIZARÁN. ¿Continuar?')) return;
+  if(!confirm('Esto va a SUBIR todo el catálogo y movimientos locales a Supabase.\n\n• Materiales locales: '+state.materials.length+'\n• Movimientos locales: '+state.movements.length+'\n• Reservas locales: '+(state.reservations||[]).length+'\n\nDurante la operación se desactivará el sync en tiempo real para no consumir cuota. Se reactivará al terminar.\n\n¿Continuar?')) return;
 
   const btn = document.getElementById('sb-seed-btn');
-  if(btn){ btn.disabled = true; btn.textContent = 'Sembrando…'; }
+  if(btn){ btn.disabled = true; btn.textContent = 'Preparando…'; }
+
+  // CRITICAL: pause realtime subscriptions during seed to avoid quota burn
+  await sbPauseRealtime();
+  // Also disable the local hook so saveState() doesn't trigger pushes
+  const prevHookEnabled = sbHookEnabled;
+  sbHookEnabled = false;
+
   try {
-    // Push in batches of 500 to avoid payload limits
-    const batchSize = 500;
-    let total = 0;
+    // Smaller batches + delay between batches to be gentle on egress
+    const batchSize = 200;
+    const delayMs = 150;
 
     // Materials
+    let total = 0;
     for(let i=0; i<state.materials.length; i+=batchSize){
       const batch = state.materials.slice(i, i+batchSize).map(sbMaterialToRow);
       const { error } = await sbClient.from('inv_materials').upsert(batch, { onConflict:'client_id' });
-      if(error){ console.error(error); alert('Error subiendo materiales: '+error.message); break; }
+      if(error){
+        console.error(error);
+        if(error.message && error.message.includes('exceed_egress')){
+          alert('Cuota Supabase agotada durante el upload de materiales.\n\nDetalle: '+error.message+'\n\nDeberás esperar al próximo mes o usar otro proyecto Supabase.');
+          break;
+        }
+        alert('Error subiendo materiales: '+error.message);
+        break;
+      }
       total += batch.length;
-      if(btn) btn.textContent = `Subiendo materiales… ${total}/${state.materials.length}`;
+      if(btn) btn.textContent = `Materiales… ${total}/${state.materials.length}`;
+      await new Promise(r=>setTimeout(r, delayMs));
     }
+
     // Movements
     total = 0;
     for(let i=0; i<state.movements.length; i+=batchSize){
       const batch = state.movements.slice(i, i+batchSize).map(sbMovementToRow);
       const { error } = await sbClient.from('inv_movements').upsert(batch, { onConflict:'client_id' });
-      if(error){ console.error(error); alert('Error subiendo movimientos: '+error.message); break; }
+      if(error){
+        console.error(error);
+        if(error.message && error.message.includes('exceed_egress')){
+          alert('Cuota Supabase agotada durante el upload de movimientos.\n\nDetalle: '+error.message);
+          break;
+        }
+        alert('Error subiendo movimientos: '+error.message);
+        break;
+      }
       total += batch.length;
-      if(btn) btn.textContent = `Subiendo movimientos… ${total}/${state.movements.length}`;
+      if(btn) btn.textContent = `Movimientos… ${total}/${state.movements.length}`;
+      await new Promise(r=>setTimeout(r, delayMs));
     }
-    // Reservations
+
+    // Reservations (small set, single batch)
     if(Array.isArray(state.reservations) && state.reservations.length){
       const batch = state.reservations.map(sbReservationToRow);
       const { error } = await sbClient.from('inv_reservations').upsert(batch, { onConflict:'client_id' });
@@ -7649,7 +7688,31 @@ async function sbSeedFromLocal(){
     alert('Error inesperado: '+e.message);
   } finally {
     if(btn){ btn.disabled = false; btn.textContent = 'Sembrar Supabase desde HTML'; }
+    // Resume realtime and re-enable hook
+    sbHookEnabled = prevHookEnabled;
+    await sbResumeRealtime();
+    // Update baseline so we don't re-push everything we just sent
+    sbLastMatId = state.materials.reduce((mx,m)=>Math.max(mx, m.id||0), 0);
+    sbLastMovId = state.movements.reduce((mx,m)=>Math.max(mx, m.id||0), 0);
   }
+}
+
+async function sbPauseRealtime(){
+  if(!sbRealtimeChannels.length) return;
+  try {
+    for(const ch of sbRealtimeChannels){
+      try { await sbClient.removeChannel(ch); } catch(_){}
+    }
+    sbRealtimeChannels = [];
+    console.log('[SB] Realtime paused for seed operation');
+  } catch(e){ console.warn('[SB] pause realtime:', e.message); }
+}
+
+async function sbResumeRealtime(){
+  // Wait a beat, then re-subscribe
+  await new Promise(r=>setTimeout(r, 500));
+  sbSubscribeRealtime();
+  console.log('[SB] Realtime resumed after seed');
 }
 
 //==================================================================
