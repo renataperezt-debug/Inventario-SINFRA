@@ -2987,7 +2987,7 @@ function getOtaPeriodRange(){
 
 function filterSalidasForOta(){
   const range = getOtaPeriodRange();
-  let movs = state.movements.filter(m=>m.type === 'salida');
+  let movs = state.movements.filter(m=>m.type === 'salida' && !m._adjustment);
   if(range.from) movs = movs.filter(m => m.date >= range.from && m.date <= range.to);
 
   const search = (document.getElementById('ota-search').value||'').toLowerCase().trim();
@@ -3812,8 +3812,8 @@ function setupQuickLookup(){
       const specBits = [sp.marca, sp.modelo, sp.medidas].filter(Boolean).join(' · ');
       const isCrit = m.critico && m.critico.toLowerCase()!=='ok';
       // Reservation banner — only when there are active reservations. Disponible real is hero.
-      // Per-material movements summary (entradas/salidas)
-      const matMovs = state.movements.filter(mv => mv.matId === m.id);
+      // Per-material movements summary (entradas/salidas, excluyendo ajustes internos)
+      const matMovs = state.movements.filter(mv => mv.matId === m.id && !mv._adjustment);
       const entMovs = matMovs.filter(mv => mv.type === 'entrada');
       const salMovs = matMovs.filter(mv => mv.type === 'salida');
       const entQty = entMovs.reduce((s,mv)=>s+(Number(mv.qty)||0), 0);
@@ -4000,7 +4000,9 @@ function getPeriodRange(period){
 function filterMovsByPeriod(period){
   const r = getPeriodRange(period);
   if(!r.from) return [];
-  return state.movements.filter(m=>m.date >= r.from && m.date <= r.to);
+  // Adjustments (manual stock corrections) are NOT counted as real entries/exits
+  // for dashboard analytics. They show up in Historial only.
+  return state.movements.filter(m=>m.date >= r.from && m.date <= r.to && !m._adjustment);
 }
 
 function setPeriod(p){
@@ -4084,7 +4086,7 @@ function getAlerts(){
   }
   const recentDays = 30;
   const cutoff = new Date(Date.now() - recentDays*86400000).toISOString();
-  const recentIds = new Set(state.movements.filter(m=>m.timestamp >= cutoff).map(m=>m.matId));
+  const recentIds = new Set(state.movements.filter(m=>m.timestamp >= cutoff && !m._adjustment).map(m=>m.matId));
   const zeroActive = state.materials.filter(m=>recentIds.has(m.id) && AREA_KEYS.every(k=>(m.stock[k]||0)===0));
   if(zeroActive.length){
     alerts.push({
@@ -4185,7 +4187,7 @@ function renderUsageTrend(periodMovs, range){
   // Previous period (same length) for delta comparison in summary boxes
   const prevRange = getPrevPeriodRange(dashPeriod);
   const prevMovs = (prevRange.from)
-    ? state.movements.filter(m=> m.date >= prevRange.from && m.date <= prevRange.to)
+    ? state.movements.filter(m=> m.date >= prevRange.from && m.date <= prevRange.to && !m._adjustment)
     : [];
   const prevMap = sumSalidasByMat(prevMovs);
 
@@ -4299,8 +4301,8 @@ function renderFrequencyAnalysis(periodMovs, range){
 
   const useAll = freqMode === 'all';
   const movs = useAll
-    ? state.movements.filter(m => m.type === 'salida')
-    : periodMovs.filter(m => m.type === 'salida');
+    ? state.movements.filter(m => m.type === 'salida' && !m._adjustment)
+    : periodMovs.filter(m => m.type === 'salida' && !m._adjustment);
 
   if(rangeEl){
     if(useAll){
