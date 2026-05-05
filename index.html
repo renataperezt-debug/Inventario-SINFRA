@@ -1624,10 +1624,15 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         <option value="entrada">Solo entradas</option>
         <option value="salida">Solo salidas</option>
         <option value="reserva">Solo reservas</option>
+        <option value="ajuste">Solo ajustes internos</option>
       </select>
       <select id="hist-area"><option value="">Todas las áreas</option></select>
       <input type="date" id="hist-from" title="Desde">
       <input type="date" id="hist-to" title="Hasta">
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);cursor:pointer;white-space:nowrap" title="Los ajustes internos son correcciones manuales de stock por área. Por defecto se ocultan.">
+        <input type="checkbox" id="hist-show-adj" style="margin:0">
+        Mostrar ajustes internos
+      </label>
       <span class="count" id="hist-count">0 movimientos</span>
     </div>
     <div class="table-wrap">
@@ -4841,6 +4846,7 @@ function renderHistorial(){
   const area = document.getElementById('hist-area').value;
   const from = document.getElementById('hist-from').value;
   const to = document.getElementById('hist-to').value;
+  const showAdj = document.getElementById('hist-show-adj').checked;
 
   // Convert reservations into uniform "row" objects so they merge with movements
   const rsvRows = state.reservations.map(r=>({
@@ -4867,7 +4873,14 @@ function renderHistorial(){
   const movRows = state.movements.map(m=>({ ...m, _kind: 'mov' }));
   let rows = [...movRows, ...rsvRows].sort((a,b)=>(b.timestamp||'').localeCompare(a.timestamp||''));
 
-  if(type) rows = rows.filter(r=>r.type===type);
+  // Hide adjustments by default unless user toggles "Mostrar ajustes internos"
+  // OR explicitly filters by "ajuste" type
+  if(type === 'ajuste'){
+    rows = rows.filter(r => r._adjustment);
+  } else {
+    if(!showAdj) rows = rows.filter(r => !r._adjustment);
+    if(type) rows = rows.filter(r => r.type === type);
+  }
   if(area) rows = rows.filter(r=>r.area===area);
   if(from) rows = rows.filter(r=>r.date >= from);
   if(to)   rows = rows.filter(r=>r.date <= to);
@@ -4881,13 +4894,13 @@ function renderHistorial(){
 
   const movCount = rows.filter(r=>r._kind==='mov').length;
   const rsvCount = rows.filter(r=>r._kind==='reserva').length;
+  const adjCount = rows.filter(r=>r._adjustment).length;
   const total = rows.length;
   const cnt = document.getElementById('hist-count');
-  if(rsvCount > 0){
-    cnt.textContent = `${total.toLocaleString('es-CL')} eventos · ${movCount} mov. + ${rsvCount} reservas`;
-  } else {
-    cnt.textContent = `${total.toLocaleString('es-CL')} movimiento${total===1?'':'s'}`;
-  }
+  let label = `${total.toLocaleString('es-CL')} ${total===1?'evento':'eventos'}`;
+  if(rsvCount > 0) label += ` · ${movCount} mov. + ${rsvCount} res.`;
+  if(adjCount > 0) label += ` · ${adjCount} ajuste${adjCount===1?'':'s'}`;
+  cnt.textContent = label;
 
   const tb = document.querySelector('#hist-tbl tbody');
   if(!rows.length){
@@ -4928,9 +4941,13 @@ function renderHistorial(){
     // Movement row (original layout)
     const sign = r.type==='entrada' ? '+' : (r.type==='salida' ? '−' : '+');
     const destCell = r.type==='salida' ? escHtml(DEST_LABEL[r.destino]||r.destino||'—') : '—';
+    // Adjustments get a distinct tag instead of entrada/salida
+    const typeTag = r._adjustment
+      ? `<span class="tag" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A">Ajuste interno</span>`
+      : `<span class="tag ${r.type}">${r.type}</span>`;
     return `<tr>
       <td>${escHtml(fmtDateTime(r.timestamp))}<br><small style="color:var(--muted)">${escHtml(fmtDate(r.date))}</small></td>
-      <td><span class="tag ${r.type}">${r.type}</span></td>
+      <td>${typeTag}</td>
       <td>${escHtml(r.material)}</td>
       <td class="sap">${escHtml(r.sap ?? '—')}</td>
       <td class="num"><b>${sign}${r.qty}</b></td>
@@ -4949,7 +4966,10 @@ function renderHistorial(){
     tb.innerHTML += `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:14px">Mostrando primeros ${cap} de ${rows.length}.</td></tr>`;
   }
 }
-['hist-search','hist-type','hist-area','hist-from','hist-to'].forEach(id=>document.getElementById(id).addEventListener('input', renderHistorial));
+['hist-search','hist-type','hist-area','hist-from','hist-to','hist-show-adj'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', renderHistorial);
+});
 
 async function deleteMov(id){
   const m = state.movements.find(x=>x.id===id);
@@ -6558,8 +6578,10 @@ window.setPeriod = setPeriod;
   </div>
   <div class="chat-msgs" id="chat-msgs"></div>
   <div class="chat-suggest" id="chat-suggest"></div>
+  <div class="chat-faq-panel" id="chat-faq-panel" style="display:none"></div>
   <form class="chat-input-wrap" id="chat-form" onsubmit="chatSend(event)">
-    <input id="chat-input" placeholder="Escribe tu pregunta..." autocomplete="off">
+    <button type="button" id="chat-faq-btn" onclick="chatToggleFaq()" title="Preguntas frecuentes" style="background:#F1F5F9;border:1px solid #CBD5E1;color:#475569;width:34px;height:34px;border-radius:8px;cursor:pointer;font-weight:700;flex:0 0 auto">?</button>
+    <input id="chat-input" placeholder="Escribe tu pregunta o usa el boton ?" autocomplete="off">
     <button type="submit" id="chat-submit">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>
