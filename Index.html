@@ -830,6 +830,30 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
 }
 .filter-chips-bar .fcb-clear:hover{ background: var(--ink); color: #fff }
 .filter-chips-bar .fcb-clear svg{ width: 11px; height: 11px }
+
+/* ---------- FOLIO ITEMS (multi-material per folio) ---------- */
+.folio-picker{ display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; padding:12px; background:var(--bg); border:1px dashed var(--line); border-radius:var(--r-sm); margin-bottom:10px }
+.folio-picker .folio-pick-search{ flex:1 1 280px; min-width:0 }
+.folio-picker .folio-pick-qty{ width:120px; flex-shrink:0 }
+.folio-picker .folio-pick-qty input{ width:100% }
+.folio-picker .btn-add-item{ flex-shrink:0; height:42px; align-self:flex-start; padding:0 16px; background:var(--teal); color:#fff; border:0; border-radius:var(--r-sm); font-weight:500; font-size:14px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background .15s; font-family:inherit }
+.folio-picker .btn-add-item:hover{ background:var(--teal-d) }
+.folio-picker .btn-add-item:disabled{ background:#C8CDD3; cursor:not-allowed }
+
+.folio-items-list{ margin-top:6px }
+.folio-items-list:empty::before{ content:"Aún no has agregado materiales a este folio."; display:block; padding:12px; text-align:center; color:var(--muted); font-size:13px; background:var(--bg); border:1px dashed var(--line); border-radius:var(--r-sm) }
+.folio-items-table{ width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:var(--r-sm); overflow:hidden }
+.folio-items-table thead th{ background:var(--ink); color:#fff; text-align:left; padding:8px 12px; font-size:12px; font-weight:500; text-transform:uppercase; letter-spacing:.3px }
+.folio-items-table tbody td{ padding:10px 12px; border-top:1px solid var(--line); font-size:14px; vertical-align:middle }
+.folio-items-table tbody tr:hover{ background:var(--bg) }
+.folio-items-table .fi-name{ font-weight:500; color:var(--ink) }
+.folio-items-table .fi-sap{ font-family:'Roboto Mono','Consolas',monospace; font-size:12px; color:var(--muted); margin-top:2px }
+.folio-items-table .fi-qty{ font-weight:600; color:var(--ink); text-align:right; white-space:nowrap }
+.folio-items-table .fi-stock-warn{ display:inline-block; margin-left:8px; padding:2px 6px; background:var(--red-l); color:var(--red); border-radius:10px; font-size:11px; font-weight:500 }
+.folio-items-table .fi-rm{ background:none; border:1px solid var(--line); color:var(--muted); width:28px; height:28px; border-radius:50%; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:18px; line-height:1; transition:all .15s; font-family:inherit }
+.folio-items-table .fi-rm:hover{ background:var(--red); color:#fff; border-color:var(--red) }
+.folio-items-table tfoot td{ padding:8px 12px; background:var(--bg); font-size:13px; color:var(--ink-2); border-top:1px solid var(--line) }
+.folio-items-table tfoot strong{ color:var(--ink) }
 </style>
 </head>
 <body>
@@ -1140,14 +1164,10 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
     <form id="form-entrada" autocomplete="off">
       <div class="form-grid">
 
-        <div class="field field-full" id="ent-search-wrap">
-          <label>Material <span class="req">*</span></label>
-          <div class="msearch">
-            <input type="text" id="ent-search" placeholder="Buscar por nombre o código SAP..." autocomplete="off">
-            <div class="msearch-results" id="ent-results"></div>
-          </div>
-          <div id="ent-selected"></div>
-          <span class="field-hint">¿No encuentras el material? Pide al encargado que lo cree desde la pestaña <b>Crear material</b>.</span>
+        <div class="field field-full">
+          <label>N° Folio <span class="req">*</span></label>
+          <input type="text" id="ent-folio" placeholder="Ej. F-2026-00123" autocomplete="off">
+          <span class="field-hint">Número del folio físico (guía, recibo, papel) que respalda esta entrada. Todos los materiales que agregues abajo se registrarán bajo este mismo folio.</span>
         </div>
 
         <div class="field field-full">
@@ -1155,9 +1175,23 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
           <div class="area-pick" id="ent-areas"></div>
         </div>
 
-        <div class="field">
-          <label>Cantidad <span class="req">*</span></label>
-          <input type="number" id="ent-qty" min="1" step="1" placeholder="Ej. 50">
+        <div class="field field-full">
+          <label>Materiales del folio <span class="req">*</span></label>
+          <div class="folio-picker">
+            <div class="folio-pick-search">
+              <div class="msearch">
+                <input type="text" id="ent-search" placeholder="Buscar material por nombre o código SAP..." autocomplete="off">
+                <div class="msearch-results" id="ent-results"></div>
+              </div>
+              <div id="ent-selected"></div>
+            </div>
+            <div class="folio-pick-qty">
+              <input type="number" id="ent-qty" min="1" step="1" placeholder="Cantidad">
+            </div>
+            <button type="button" class="btn-add-item" onclick="addEntItem()">+ Agregar al folio</button>
+          </div>
+          <div id="ent-items" class="folio-items-list"></div>
+          <span class="field-hint">¿No encuentras el material? Pide al encargado que lo cree desde la pestaña <b>Crear material</b>.</span>
         </div>
 
         <div class="field">
@@ -1168,11 +1202,6 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         <div class="field">
           <label>Responsable que recibe <span class="req">*</span></label>
           <input type="text" id="ent-resp" placeholder="Nombre apellido">
-        </div>
-
-        <div class="field">
-          <label>N° Guía / Orden / Documento</label>
-          <input type="text" id="ent-doc" placeholder="Opcional">
         </div>
 
         <div class="field field-full">
@@ -1206,12 +1235,9 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       <div class="form-grid">
 
         <div class="field field-full">
-          <label>Material <span class="req">*</span></label>
-          <div class="msearch">
-            <input type="text" id="sal-search" placeholder="Buscar por nombre o código SAP..." autocomplete="off">
-            <div class="msearch-results" id="sal-results"></div>
-          </div>
-          <div id="sal-selected"></div>
+          <label>N° Folio <span class="req">*</span></label>
+          <input type="text" id="sal-folio" placeholder="Ej. F-2026-00123" autocomplete="off">
+          <span class="field-hint">Número del folio físico (guía, vale, papel) que respalda esta salida. Todos los materiales que agregues abajo se registrarán bajo este mismo folio.</span>
         </div>
 
         <div class="field field-full">
@@ -1222,14 +1248,27 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         <div class="field field-full">
           <label>Destino (a dónde va el material) <span class="req">*</span></label>
           <div class="dest-pick" id="sal-destinos"></div>
-          <span class="field-hint" id="sal-dest-hint">Selecciona dónde se va a usar el material. No puede ser el mismo que el área que entrega.</span>
+          <span class="field-hint" id="sal-dest-hint">Selecciona dónde se va a usar el material.</span>
         </div>
 
-        <div class="field">
-          <label>Cantidad <span class="req">*</span></label>
-          <input type="number" id="sal-qty" min="1" step="1" placeholder="Ej. 5">
-          <span class="field-hint" id="sal-qty-hint"></span>
-          <span class="field-err" id="sal-qty-err"></span>
+        <div class="field field-full">
+          <label>Materiales del folio <span class="req">*</span></label>
+          <div class="folio-picker">
+            <div class="folio-pick-search">
+              <div class="msearch">
+                <input type="text" id="sal-search" placeholder="Buscar material por nombre o código SAP..." autocomplete="off">
+                <div class="msearch-results" id="sal-results"></div>
+              </div>
+              <div id="sal-selected"></div>
+            </div>
+            <div class="folio-pick-qty">
+              <input type="number" id="sal-qty" min="1" step="1" placeholder="Cantidad">
+              <span class="field-hint" id="sal-qty-hint"></span>
+              <span class="field-err" id="sal-qty-err"></span>
+            </div>
+            <button type="button" class="btn-add-item" onclick="addSalItem()">+ Agregar al folio</button>
+          </div>
+          <div id="sal-items" class="folio-items-list"></div>
         </div>
 
         <div class="field">
@@ -2432,6 +2471,7 @@ function renderAreaPickers(){
       if(prefix==='sal'){
         updateSalQtyHint();
         updateDestinoLockout();
+        if(typeof renderSalItems === 'function') renderSalItems();
       }
       const results = document.getElementById(prefix+'-results');
       if(results && results.classList.contains('open')){
@@ -2446,22 +2486,13 @@ function renderAreaPickers(){
   if(hf) hf.innerHTML = opts;
 }
 
-// Disable the destino option that matches the currently-selected área
+// Lockout removido: ahora el destino puede coincidir con el área de origen.
 function updateDestinoLockout(){
-  const area = document.querySelector('#sal-areas input:checked')?.value;
   document.querySelectorAll('#sal-destinos input').forEach(inp=>{
-    const sameAsArea = (inp.value === area);
-    inp.disabled = sameAsArea;
-    if(sameAsArea && inp.checked){
-      inp.checked = false;
-    }
+    inp.disabled = false;
   });
   const hint = document.getElementById('sal-dest-hint');
-  if(area){
-    hint.innerHTML = `El destino no puede ser <b>${escHtml(AREA_LABEL[area])}</b> (área de origen). Esa opción aparece tachada.`;
-  } else {
-    hint.textContent = 'Selecciona dónde se va a usar el material. No puede ser el mismo que el área que entrega.';
-  }
+  if(hint) hint.textContent = 'Selecciona dónde se va a usar el material.';
 }
 
 function updateSalQtyHint(){
@@ -2475,34 +2506,101 @@ function updateSalQtyHint(){
   hint.textContent = `Disponible en ${AREA_LABEL[area]}: ${avail}`;
 }
 
-// ---------- ENTRADA ----------
+// ---------- ENTRADA (multi-material por folio) ----------
+
+// In-memory list of items being added to the current folio.
+// Each item: { matId, sap, material, clasif, qty }
+let entFolioItems = [];
+
+function renderEntItems(){
+  const ct = document.getElementById('ent-items');
+  if(!ct) return;
+  if(!entFolioItems.length){
+    ct.innerHTML = '';   // CSS :empty::before muestra placeholder
+    return;
+  }
+  const totalQty = entFolioItems.reduce((s,it)=>s+it.qty, 0);
+  const rows = entFolioItems.map((it, idx)=>`
+    <tr>
+      <td>
+        <div class="fi-name">${escHtml(it.material)}</div>
+        <div class="fi-sap">${escHtml(it.clasif)} · SAP ${escHtml(it.sap ?? '—')}</div>
+      </td>
+      <td class="fi-qty">${it.qty}</td>
+      <td style="width:50px;text-align:center">
+        <button type="button" class="fi-rm" onclick="removeEntItem(${idx})" title="Quitar este material del folio">×</button>
+      </td>
+    </tr>`).join('');
+  ct.innerHTML = `<table class="folio-items-table">
+    <thead><tr><th>Material</th><th style="text-align:right">Cantidad</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr>
+      <td><strong>${entFolioItems.length}</strong> material${entFolioItems.length===1?'':'es'} en este folio</td>
+      <td class="fi-qty"><strong>${totalQty}</strong> unid.</td>
+      <td></td>
+    </tr></tfoot>
+  </table>`;
+}
+
+function addEntItem(){
+  const m = getSelectedMat('ent');
+  const qty = parseInt(document.getElementById('ent-qty').value);
+  if(!m){ toast('Selecciona un material primero','err'); return; }
+  if(!qty || qty<=0){ toast('Ingresa una cantidad válida','err'); return; }
+  entFolioItems.push({
+    matId: m.id, sap: m.sap, material: m.material, clasif: m.clasif, qty
+  });
+  renderEntItems();
+  // Limpiar buscador y cantidad para el siguiente material, conservando todo lo demás
+  clearSel('ent');
+  document.getElementById('ent-search').value = '';
+  document.getElementById('ent-qty').value = '';
+  document.getElementById('ent-search').focus();
+}
+
+function removeEntItem(idx){
+  if(idx >= 0 && idx < entFolioItems.length){
+    entFolioItems.splice(idx, 1);
+    renderEntItems();
+  }
+}
+
 document.getElementById('form-entrada').addEventListener('submit', e=>{
   e.preventDefault();
-  const m = getSelectedMat('ent');
+  const folio = document.getElementById('ent-folio').value.trim();
   const area = document.querySelector('#ent-areas input:checked')?.value;
-  const qty = parseInt(document.getElementById('ent-qty').value);
   const date = document.getElementById('ent-date').value || todayStr();
   const resp = document.getElementById('ent-resp').value.trim();
-  const doc = document.getElementById('ent-doc').value.trim();
   const notes = document.getElementById('ent-notes').value.trim();
 
-  if(!m){ toast('Selecciona un material','err'); return; }
+  if(!folio){ toast('Ingresa el N° de folio','err'); return; }
   if(!area){ toast('Selecciona el área que recibe','err'); return; }
-  if(!qty || qty<=0){ toast('Ingresa una cantidad válida','err'); return; }
   if(!resp){ toast('Indica el responsable que recibe','err'); return; }
+  if(!entFolioItems.length){
+    toast('Agrega al menos un material al folio','err');
+    return;
+  }
 
-  m.stock[area] = (m.stock[area]||0) + qty;
-  state.movements.push({
-    id: state.nextMovId++,
-    type: 'entrada',
-    matId: m.id, sap: m.sap, material: m.material, clasif: m.clasif,
-    area, qty, date,
-    timestamp: new Date().toISOString(),
-    user: state.user || '—',
-    resp, doc, notes,
-  });
+  const ts = new Date().toISOString();
+  let totalQty = 0;
+  // Generar un movimiento por material; comparten folio + datos comunes
+  for(const it of entFolioItems){
+    const mat = state.materials.find(x=>x.id===it.matId);
+    if(!mat){ continue; }   // safety: material removed entre add y submit
+    mat.stock[area] = (mat.stock[area]||0) + it.qty;
+    state.movements.push({
+      id: state.nextMovId++,
+      type: 'entrada',
+      matId: mat.id, sap: mat.sap, material: mat.material, clasif: mat.clasif,
+      area, qty: it.qty, date,
+      timestamp: ts,
+      user: state.user || '—',
+      folio, resp, notes,
+    });
+    totalQty += it.qty;
+  }
   saveState();
-  toast(`Entrada registrada: +${qty} ${m.material.substring(0,30)}... → ${AREA_LABEL[area]}`, 'ok');
+  toast(`Entrada registrada: folio ${folio} · ${entFolioItems.length} material${entFolioItems.length===1?'':'es'} · ${totalQty} unid. → ${AREA_LABEL[area]}`, 'ok', 4500);
   resetEntrada();
 });
 
@@ -2510,74 +2608,190 @@ function resetEntrada(){
   document.getElementById('form-entrada').reset();
   document.getElementById('ent-date').value = todayStr();
   clearSel('ent');
+  entFolioItems = [];
+  renderEntItems();
 }
 
-// ---------- SALIDA ----------
+// ---------- SALIDA (multi-material por folio) ----------
+
+// In-memory list of items being added to the current folio.
+// Each item: { matId, sap, material, clasif, qty }
+let salFolioItems = [];
+
+function renderSalItems(){
+  const ct = document.getElementById('sal-items');
+  if(!ct) return;
+  if(!salFolioItems.length){
+    ct.innerHTML = '';
+    return;
+  }
+  const area = document.querySelector('#sal-areas input:checked')?.value;
+  // Agregar la cantidad acumulada por material+área para advertir si supera stock
+  const accum = {};
+  for(const it of salFolioItems){ accum[it.matId] = (accum[it.matId]||0) + it.qty; }
+
+  const totalQty = salFolioItems.reduce((s,it)=>s+it.qty, 0);
+  const rows = salFolioItems.map((it, idx)=>{
+    const mat = state.materials.find(x=>x.id===it.matId);
+    const stockHere = (mat && area) ? (mat.stock[area]||0) : null;
+    const totalForThisMat = accum[it.matId];
+    const overstocked = (stockHere !== null) && totalForThisMat > stockHere;
+    const warn = overstocked
+      ? `<span class="fi-stock-warn" title="La suma de este material en el folio supera el stock disponible en ${escHtml(AREA_LABEL[area])}">excede stock (${stockHere} disp.)</span>`
+      : '';
+    return `<tr>
+      <td>
+        <div class="fi-name">${escHtml(it.material)}</div>
+        <div class="fi-sap">${escHtml(it.clasif)} · SAP ${escHtml(it.sap ?? '—')}</div>
+      </td>
+      <td class="fi-qty">${it.qty}${warn}</td>
+      <td style="width:50px;text-align:center">
+        <button type="button" class="fi-rm" onclick="removeSalItem(${idx})" title="Quitar este material del folio">×</button>
+      </td>
+    </tr>`;
+  }).join('');
+  ct.innerHTML = `<table class="folio-items-table">
+    <thead><tr><th>Material</th><th style="text-align:right">Cantidad</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr>
+      <td><strong>${salFolioItems.length}</strong> material${salFolioItems.length===1?'':'es'} en este folio</td>
+      <td class="fi-qty"><strong>${totalQty}</strong> unid.</td>
+      <td></td>
+    </tr></tfoot>
+  </table>`;
+}
+
+function addSalItem(){
+  const m = getSelectedMat('sal');
+  const qty = parseInt(document.getElementById('sal-qty').value);
+  const area = document.querySelector('#sal-areas input:checked')?.value;
+  document.getElementById('sal-qty-err').textContent = '';
+  if(!m){ toast('Selecciona un material primero','err'); return; }
+  if(!qty || qty<=0){ toast('Ingresa una cantidad válida','err'); return; }
+  if(!area){ toast('Selecciona primero el área que entrega','err'); return; }
+  // Validación blanda: avisar (no bloquear) si supera stock — la dura es al confirmar
+  const avail = m.stock[area] || 0;
+  const previouslyAddedSameMat = salFolioItems
+    .filter(x=>x.matId===m.id)
+    .reduce((s,x)=>s+x.qty, 0);
+  if(qty + previouslyAddedSameMat > avail){
+    toast(`Aviso: con esta línea se suman ${qty + previouslyAddedSameMat} unid., pero hay solo ${avail} disponibles en ${AREA_LABEL[area]}. Se agregó igual; revísalo antes de confirmar.`, 'warn', 5000);
+  }
+  salFolioItems.push({
+    matId: m.id, sap: m.sap, material: m.material, clasif: m.clasif, qty
+  });
+  renderSalItems();
+  clearSel('sal');
+  document.getElementById('sal-search').value = '';
+  document.getElementById('sal-qty').value = '';
+  document.getElementById('sal-qty-hint').textContent = '';
+  document.getElementById('sal-search').focus();
+}
+
+function removeSalItem(idx){
+  if(idx >= 0 && idx < salFolioItems.length){
+    salFolioItems.splice(idx, 1);
+    renderSalItems();
+  }
+}
+
 document.getElementById('form-salida').addEventListener('submit', async e=>{
   e.preventDefault();
-  const m = getSelectedMat('sal');
+  const folio = document.getElementById('sal-folio').value.trim();
   const area = document.querySelector('#sal-areas input:checked')?.value;
   const destino = document.querySelector('#sal-destinos input:checked')?.value;
-  const qty = parseInt(document.getElementById('sal-qty').value);
   const date = document.getElementById('sal-date').value || todayStr();
   const resp = document.getElementById('sal-resp').value.trim();
   const ot = document.getElementById('sal-ot').value.trim();
   const activity = document.getElementById('sal-act').value.trim();
   const notes = document.getElementById('sal-notes').value.trim();
 
-  if(!m){ toast('Selecciona un material','err'); return; }
+  if(!folio){ toast('Ingresa el N° de folio','err'); return; }
   if(!area){ toast('Selecciona el área que entrega','err'); return; }
   if(!destino){ toast('Selecciona el destino del material','err'); return; }
-  if(destino === area){ toast('El destino no puede ser el mismo que el área de origen','err',4000); return; }
-  if(!qty || qty<=0){ toast('Ingresa una cantidad válida','err'); return; }
   if(!resp){ toast('Indica quien retira','err'); return; }
   if(!ot){ toast('Indica la OT o N° de actividad','err'); return; }
-
-  const avail = m.stock[area] || 0;
-  if(qty > avail){
-    document.getElementById('sal-qty-err').textContent = `Stock insuficiente. Disponible en ${AREA_LABEL[area]}: ${avail}`;
-    toast(`Stock insuficiente (${avail} disponibles en ${AREA_LABEL[area]})`,'err',4000);
+  if(!salFolioItems.length){
+    toast('Agrega al menos un material al folio','err');
     return;
   }
-  // Soft check: warn if this salida would consume reserved units
-  const reservedHere = (typeof getReservedQty === 'function') ? getReservedQty(m.id, area) : 0;
-  const trueAvail = avail - reservedHere;
-  // Skip the warning if this submission is fulfilling a reservation (reserve is already accounted for)
-  const isFulfilling = !!document.getElementById('form-salida').dataset.fulfillReservationId;
-  if(reservedHere > 0 && qty > trueAvail && !isFulfilling){
-    const ok = await confirmDialog(
-      'Cantidad supera el disponible real',
-      `En ${AREA_LABEL[area]} hay ${avail} en stock pero ${reservedHere} están reservadas. Disponible real: ${trueAvail}. Si confirmas esta salida (${qty} unid.), estarás consumiendo unidades reservadas para otra OT. ¿Continuar de todas formas?`,
-      'Sí, confirmar salida', true);
-    if(!ok) return;
+
+  // Validación dura de stock: sumar por matId, comparar con stock del área
+  const totalsByMat = {};
+  for(const it of salFolioItems){ totalsByMat[it.matId] = (totalsByMat[it.matId]||0) + it.qty; }
+  const failures = [];
+  for(const matIdStr in totalsByMat){
+    const matId = parseInt(matIdStr);
+    const mat = state.materials.find(x=>x.id===matId);
+    if(!mat){ continue; }
+    const need = totalsByMat[matId];
+    const have = mat.stock[area] || 0;
+    if(need > have){
+      failures.push({ name: mat.material, need, have });
+    }
+  }
+  if(failures.length){
+    const msg = failures.slice(0,3).map(f=>`• ${f.name.substring(0,40)}: necesita ${f.need}, hay ${f.have}`).join('\n')
+                + (failures.length>3 ? `\n…y ${failures.length-3} más` : '');
+    await confirmDialog(
+      'Stock insuficiente en una o más líneas',
+      `No se puede confirmar este folio. En ${AREA_LABEL[area]}:\n\n${msg}\n\nAjusta las cantidades o quita líneas y reintenta.`,
+      'Entendido', false);
+    toast('Salida no confirmada — stock insuficiente','err',4000);
+    return;
   }
 
-  m.stock[area] = avail - qty;
-  // If destino is also a stockable area (KM15 or Reactivos), this is a transfer:
-  // we DO NOT auto-add to destination because user said destinos are usage labels,
-  // not stockable areas. Stock only decrements from origin.
-  const newMovId = state.nextMovId++;
-  const newMov = {
-    id: newMovId,
-    type: 'salida',
-    matId: m.id, sap: m.sap, material: m.material, clasif: m.clasif,
-    area, destino, qty, date,
-    timestamp: new Date().toISOString(),
-    user: state.user || '—',
-    resp, ot, activity, notes,
-  };
-  state.movements.push(newMov);
+  // Validación blanda de reservas (igual que antes, pero por mat acumulado)
+  let warnedReservation = false;
+  for(const matIdStr in totalsByMat){
+    const matId = parseInt(matIdStr);
+    const mat = state.materials.find(x=>x.id===matId);
+    if(!mat) continue;
+    const reservedHere = (typeof getReservedQty === 'function') ? getReservedQty(matId, area) : 0;
+    const trueAvail = (mat.stock[area]||0) - reservedHere;
+    if(reservedHere > 0 && totalsByMat[matId] > trueAvail){
+      const ok = await confirmDialog(
+        'Una línea consume unidades reservadas',
+        `${mat.material}\n\nEn ${AREA_LABEL[area]} hay ${mat.stock[area]} en stock pero ${reservedHere} están reservadas. Disponible real: ${trueAvail}. Esta salida (${totalsByMat[matId]} unid.) consumiría unidades reservadas para otra OT.\n\n¿Continuar igual con todo el folio?`,
+        'Sí, confirmar folio', true);
+      if(!ok){ return; }
+      warnedReservation = true;
+      break;
+    }
+  }
 
-  // If this salida came from a "Convertir a salida" of a reservation, mark it fulfilled
-  const fulfillId = document.getElementById('form-salida').dataset.fulfillReservationId;
+  const ts = new Date().toISOString();
+  let totalQty = 0;
+  let firstMovIdForReservation = null;
+  // Generar un movimiento por línea del folio
+  for(const it of salFolioItems){
+    const mat = state.materials.find(x=>x.id===it.matId);
+    if(!mat){ continue; }
+    mat.stock[area] = (mat.stock[area]||0) - it.qty;
+    const movId = state.nextMovId++;
+    state.movements.push({
+      id: movId,
+      type: 'salida',
+      matId: mat.id, sap: mat.sap, material: mat.material, clasif: mat.clasif,
+      area, destino, qty: it.qty, date,
+      timestamp: ts,
+      user: state.user || '—',
+      folio, resp, ot, activity, notes,
+    });
+    totalQty += it.qty;
+    if(firstMovIdForReservation === null){ firstMovIdForReservation = movId; }
+  }
+
+  // Si veníamos desde "Convertir reserva a salida", marcar la reserva como cumplida
+  const fulfillIdRaw = document.getElementById('form-salida').dataset.fulfillReservationId;
   let fulfilledRsv = null;
-  if(fulfillId){
-    const rsv = state.reservations.find(x=>x.id===parseInt(fulfillId));
+  if(fulfillIdRaw){
+    const rsv = state.reservations.find(x=>x.id===parseInt(fulfillIdRaw));
     if(rsv && rsv.status === 'active'){
       rsv.status = 'fulfilled';
-      rsv.fulfilledAt = new Date().toISOString();
+      rsv.fulfilledAt = ts;
       rsv.fulfilledBy = state.user || '—';
-      rsv.fulfilledMovId = newMovId;
+      rsv.fulfilledMovId = firstMovIdForReservation;
       fulfilledRsv = rsv;
     }
     delete document.getElementById('form-salida').dataset.fulfillReservationId;
@@ -2592,9 +2806,9 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
 
   toast(
     fulfilledRsv
-      ? `Salida registrada y reserva #${fulfilledRsv.id} cumplida: ${qty} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`
-      : `Salida registrada: ${qty} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`,
-    'ok', 3500);
+      ? `Salida confirmada y reserva #${fulfilledRsv.id} cumplida: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${totalQty} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`
+      : `Salida registrada: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${totalQty} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`,
+    'ok', 4500);
   resetSalida();
 });
 
@@ -2604,6 +2818,9 @@ function resetSalida(){
   document.getElementById('sal-qty-hint').textContent = '';
   document.getElementById('sal-qty-err').textContent = '';
   clearSel('sal');
+  delete document.getElementById('form-salida').dataset.fulfillReservationId;
+  salFolioItems = [];
+  renderSalItems();
 }
 
 // ==========================================================
@@ -3397,16 +3614,19 @@ function convertReservaToSalida(id){
   // Switch to Salida and prefill
   switchView('salida');
   setTimeout(()=>{
-    // Prefill: select material, area, qty, resp, ot, activity, notes
-    const sel = document.getElementById('sal-selected');
-    sel.dataset.matId = m.id;
-    sel.innerHTML = selectedMatCard('sal', m);
+    // Reiniciamos por si hay items previos
+    if(typeof salFolioItems !== 'undefined'){ salFolioItems = []; }
 
     // Pick area radio
     const areaRadio = document.querySelector(`#sal-areas input[value="${r.area}"]`);
     if(areaRadio){ areaRadio.checked = true; areaRadio.dispatchEvent(new Event('change')); }
 
-    document.getElementById('sal-qty').value = r.qty;
+    // Add the reservation as the first item of the folio
+    salFolioItems.push({
+      matId: m.id, sap: m.sap, material: m.material, clasif: m.clasif, qty: r.qty
+    });
+    if(typeof renderSalItems === 'function') renderSalItems();
+
     document.getElementById('sal-resp').value = r.resp || '';
     document.getElementById('sal-ot').value = r.ot || '';
     document.getElementById('sal-act').value = r.activity || '';
@@ -3415,8 +3635,7 @@ function convertReservaToSalida(id){
     // Tag the form with the reservation ID so the submit handler can mark it fulfilled
     document.getElementById('form-salida').dataset.fulfillReservationId = r.id;
 
-    if(typeof updateSalQtyHint === 'function') updateSalQtyHint();
-    toast(`Formulario de salida prellenado con reserva #${r.id}. Selecciona destino y confirma.`, 'ok', 4500);
+    toast(`Folio prellenado con reserva #${r.id}. Puedes agregar más materiales o confirmar.`, 'ok', 4500);
   }, 200);
 }
 window.convertReservaToSalida = convertReservaToSalida;
