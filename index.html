@@ -5675,25 +5675,111 @@ function savePin(){
 }
 
 async function askResetMovements(){
+  // PIN gate
+  if(typeof editUnlocked !== 'undefined' && !editUnlocked){
+    alert('Esta acción requiere el PIN de administrador.\n\nVe a la pestaña "Inventario" y abre la edición de cualquier material para desbloquear con tu PIN. Luego vuelve aquí y reintenta.');
+    return;
+  }
   const ok = await confirmDialog('Borrar movimientos',
-    `Se eliminarán ${state.movements.length} movimientos. El stock actual se mantiene. Esta acción es irreversible.`,
+    `Se eliminarán ${state.movements.length} movimientos LOCAL Y EN SUPABASE. El catálogo y el stock actual se mantienen. Esta acción es irreversible y afecta a todos los usuarios.`,
     'Sí, borrar', true);
   if(!ok) return;
+
+  // Pause hook + realtime to avoid 1-by-1 deletes burning quota
+  const wasEnabled = (typeof sbHookEnabled !== 'undefined') ? sbHookEnabled : false;
+  if(typeof sbHookEnabled !== 'undefined') sbHookEnabled = false;
+  if(typeof sbPauseRealtime === 'function'){ try { await sbPauseRealtime(); } catch(_){} }
+
+  // Bulk DELETE in Supabase first
+  if(typeof sbClient !== 'undefined' && sbClient){
+    try {
+      const { error } = await sbClient.from('inv_movements').delete().neq('client_id', -1);
+      if(error){
+        console.warn('[Reset movs] supabase delete:', error.message);
+        if(error.message && error.message.includes('exceed_egress')){
+          alert('Cuota Supabase agotada. Reset abortado.\nDetalle: '+error.message);
+          if(typeof sbHookEnabled !== 'undefined') sbHookEnabled = wasEnabled;
+          if(typeof sbResumeRealtime === 'function'){ try { await sbResumeRealtime(); } catch(_){} }
+          return;
+        }
+      }
+    } catch(e){ console.warn('[Reset movs] exception:', e.message); }
+  }
+
+  // Then clear local
   state.movements = [];
   state.nextMovId = 1;
-  saveState();
-  toast('Movimientos borrados','ok');
+  if(typeof sbMovSnapshot !== 'undefined') sbMovSnapshot.clear();
+  saveState({ skipSync: true });
+
+  // Resume sync
+  if(typeof sbHookEnabled !== 'undefined') sbHookEnabled = wasEnabled;
+  if(typeof sbResumeRealtime === 'function'){ try { await sbResumeRealtime(); } catch(_){} }
+
+  toast('Movimientos borrados (local y Supabase)','ok');
   refreshAll();
 }
+
 async function askResetAll(){
+  // PIN gate
+  if(typeof editUnlocked !== 'undefined' && !editUnlocked){
+    alert('Esta acción requiere el PIN de administrador.\n\nVe a la pestaña "Inventario" y abre la edición de cualquier material para desbloquear con tu PIN. Luego vuelve aquí y reintenta.');
+    return;
+  }
   const ok = await confirmDialog('Reset total',
-    'Se borrarán catálogo y movimientos, y se cargará el catálogo original. Esta acción es irreversible.',
-    'Sí, resetear', true);
+    `Se borrarán materiales (${state.materials.length}), movimientos (${state.movements.length}) y reservas (${(state.reservations||[]).length}) LOCAL Y EN SUPABASE. Después se cargará el catálogo original embebido en el HTML.\n\nEsta acción es irreversible y afecta a todos los usuarios.`,
+    'Sí, resetear todo', true);
   if(!ok) return;
+
+  // Pause hook + realtime to avoid 1-by-1 deletes burning quota
+  const wasEnabled = (typeof sbHookEnabled !== 'undefined') ? sbHookEnabled : false;
+  if(typeof sbHookEnabled !== 'undefined') sbHookEnabled = false;
+  if(typeof sbPauseRealtime === 'function'){ try { await sbPauseRealtime(); } catch(_){} }
+
+  // Bulk DELETE in Supabase first
+  if(typeof sbClient !== 'undefined' && sbClient){
+    try {
+      const tables = ['inv_movements','inv_reservations','inv_materials'];
+      for(const t of tables){
+        const { error } = await sbClient.from(t).delete().neq('client_id', -1);
+        if(error){
+          console.warn(`[Reset all] ${t}:`, error.message);
+          if(error.message && error.message.includes('exceed_egress')){
+            alert('Cuota Supabase agotada. Reset abortado.\nDetalle: '+error.message);
+            if(typeof sbHookEnabled !== 'undefined') sbHookEnabled = wasEnabled;
+            if(typeof sbResumeRealtime === 'function'){ try { await sbResumeRealtime(); } catch(_){} }
+            return;
+          }
+        }
+      }
+    } catch(e){ console.warn('[Reset all] exception:', e.message); }
+  }
+
+  // Clear snapshots so the next saveState doesn't try to re-push everything
+  if(typeof sbMatSnapshot !== 'undefined') sbMatSnapshot.clear();
+  if(typeof sbMovSnapshot !== 'undefined') sbMovSnapshot.clear();
+  if(typeof sbRsvSnapshot !== 'undefined') sbRsvSnapshot.clear();
+
+  // Then clear local and reload from embedded seed
   localStorage.removeItem(STORAGE_KEY);
   state = defaultState();
-  saveState();
-  toast('Sistema reseteado','ok');
+  saveState({ skipSync: true });
+
+  // Resume sync (but hook is disabled until snapshots are rebuilt below)
+  if(typeof sbResumeRealtime === 'function'){ try { await sbResumeRealtime(); } catch(_){} }
+
+  toast('Sistema reseteado. Recuerda Sembrar Supabase para subir el catálogo original.','ok', 6000);
+
+  // Build fresh snapshots from the new (default) state
+  if(typeof sbMatSnapshot !== 'undefined' && typeof sbMatSig === 'function'){
+    state.materials.forEach(m => sbMatSnapshot.set(m.id, sbMatSig(m)));
+  }
+  if(typeof sbMovSnapshot !== 'undefined' && typeof sbMovSig === 'function'){
+    state.movements.forEach(mv => sbMovSnapshot.set(mv.id, sbMovSig(mv)));
+  }
+
+  if(typeof sbHookEnabled !== 'undefined') sbHookEnabled = wasEnabled;
+
   refreshAll();
 }
 
