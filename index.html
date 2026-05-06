@@ -854,6 +854,259 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
 .folio-items-table .fi-rm:hover{ background:var(--red); color:#fff; border-color:var(--red) }
 .folio-items-table tfoot td{ padding:8px 12px; background:var(--bg); font-size:13px; color:var(--ink-2); border-top:1px solid var(--line) }
 .folio-items-table tfoot strong{ color:var(--ink) }
+
+/* ============================================================
+   MOVEMENT DETAIL MODAL — double-click on OT analysis row
+   ============================================================ */
+
+/* Overlay & card: scoped to mv-detail to avoid clashing with other modals */
+.mv-detail-bg{ z-index:200 }
+.mv-detail-card{
+  background:var(--card);
+  max-width:880px;
+  width:100%;
+  max-height:88vh;
+  display:flex;
+  flex-direction:column;
+  border-radius:var(--r);
+  box-shadow:var(--shadow-lg);
+  overflow:hidden;
+  color:var(--ink);
+}
+.mv-detail-card .modal-h{
+  background:var(--card);
+  padding:20px 24px 16px;
+}
+.mv-detail-card .modal-h h3{
+  margin:0;
+  font-size:18px;
+  font-weight:600;
+  color:var(--ink);
+  letter-spacing:-.01em;
+}
+.mv-detail-card .modal-h #mv-detail-sub{
+  margin:6px 0 0;
+  font-size:13px;
+  color:var(--muted);
+  line-height:1.4;
+}
+.mv-detail-header-text{ flex:1; min-width:0 }
+
+.mv-detail-close{
+  flex-shrink:0;
+  width:34px; height:34px;
+  display:inline-flex; align-items:center; justify-content:center;
+  background:var(--bg);
+  border:1px solid var(--line);
+  border-radius:8px;
+  color:var(--ink-2);
+  cursor:pointer;
+  padding:0;
+  transition:background .15s, color .15s, border-color .15s;
+}
+.mv-detail-close:hover{
+  background:var(--red);
+  color:#fff;
+  border-color:var(--red);
+}
+.mv-detail-close:focus-visible{
+  outline:2px solid var(--teal);
+  outline-offset:2px;
+}
+
+.mv-detail-card .modal-body{
+  background:var(--card);
+  padding:20px 24px;
+}
+.mv-detail-card .modal-foot{
+  background:#FAFBFC;
+  padding:14px 24px;
+}
+
+/* Clickable rows in OT analysis */
+.ota-lines tbody tr.ota-line-row{ cursor:pointer; transition:background .12s }
+.ota-lines tbody tr.ota-line-row:hover{ background:var(--bg) }
+.ota-lines tbody tr.ota-line-row:hover td:first-child{ box-shadow:inset 3px 0 0 var(--teal) }
+
+/* Folio summary block */
+.mv-folio-summary{
+  background:linear-gradient(180deg, var(--teal-l) 0%, var(--bg) 100%);
+  border:1px solid var(--line);
+  border-radius:var(--r-sm);
+  padding:14px 18px;
+  margin-bottom:18px;
+}
+.mv-folio-summary .fs-label{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.6px;
+  color:var(--teal-d);
+  font-weight:600;
+  margin-bottom:6px;
+}
+.mv-folio-summary .fs-folio{
+  font-size:24px;
+  font-weight:700;
+  color:var(--ink);
+  font-family:'Roboto Mono','Consolas',monospace;
+  line-height:1.1;
+  letter-spacing:-.01em;
+}
+.mv-folio-summary .fs-meta{
+  margin-top:6px;
+  color:var(--ink-2);
+  font-size:13px;
+}
+.mv-folio-summary.is-empty{
+  background:var(--bg);
+}
+.mv-folio-summary.is-empty .fs-folio{
+  color:var(--muted);
+  font-size:15px;
+  font-family:inherit;
+  font-weight:500;
+  font-style:italic;
+}
+
+/* Common-data grid */
+.mv-detail-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+  gap:16px 20px;
+  margin-bottom:6px;
+}
+.mv-cell{ min-width:0 }
+.mv-cell-wide{ grid-column:1 / -1 }
+.mv-cell-label{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  color:var(--muted);
+  font-weight:600;
+  margin-bottom:5px;
+}
+.mv-cell-value{
+  font-size:14px;
+  color:var(--ink);
+  font-weight:500;
+  line-height:1.45;
+  word-break:break-word;
+}
+.mv-cell-value.mono{
+  font-family:'Roboto Mono','Consolas',monospace;
+  font-size:13px;
+}
+.mv-cell-sub{
+  font-size:11px;
+  color:var(--muted);
+  margin-top:4px;
+}
+
+/* Type pill */
+.mv-pill{
+  display:inline-block;
+  padding:3px 10px;
+  background:var(--green-l);
+  color:var(--green);
+  border-radius:12px;
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:.3px;
+  text-transform:uppercase;
+}
+.mv-pill.is-out{ background:var(--orange-l); color:var(--orange-d) }
+
+/* Section divider */
+.mv-section-h{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  margin:22px 0 10px;
+  padding-bottom:8px;
+  border-bottom:1px solid var(--line);
+}
+.mv-section-h .title{
+  font-size:12px;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  color:var(--muted);
+  font-weight:600;
+}
+.mv-section-h .count{
+  font-size:13px;
+  color:var(--ink);
+  font-weight:600;
+}
+
+/* Items table */
+.mv-items-table{
+  width:100%;
+  border-collapse:collapse;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--r-sm);
+  overflow:hidden;
+  font-size:13px;
+}
+.mv-items-table thead th{
+  background:var(--ink);
+  color:#fff;
+  text-align:left;
+  padding:10px 14px;
+  font-size:11px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.4px;
+}
+.mv-items-table thead th.num{ text-align:right }
+.mv-items-table tbody td{
+  padding:10px 14px;
+  border-top:1px solid var(--line);
+  vertical-align:top;
+  color:var(--ink);
+}
+.mv-items-table tbody td.num{ text-align:right; font-weight:600; white-space:nowrap }
+.mv-items-table tbody tr.is-current{
+  background:var(--teal-l);
+}
+.mv-items-table tbody tr.is-current td:first-child{
+  box-shadow:inset 3px 0 0 var(--teal);
+}
+.mvi-name{ font-weight:600; color:var(--ink) }
+.mvi-meta{ font-size:11px; color:var(--muted); margin-top:3px }
+.mvi-current-badge{
+  display:inline-block;
+  margin-left:8px;
+  padding:1px 7px;
+  background:var(--teal);
+  color:#fff;
+  border-radius:8px;
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.3px;
+  text-transform:uppercase;
+  vertical-align:1px;
+}
+.mv-items-table .mono{ font-family:'Roboto Mono','Consolas',monospace; font-size:12px }
+.mv-items-table tfoot td{
+  padding:10px 14px;
+  background:var(--bg);
+  font-size:13px;
+  color:var(--ink);
+  border-top:1px solid var(--line);
+  font-weight:600;
+}
+.mv-items-table tfoot td.num{ text-align:right }
+
+/* Mobile tweaks */
+@media (max-width:600px){
+  .mv-detail-card{ max-height:94vh }
+  .mv-detail-card .modal-h,
+  .mv-detail-card .modal-body,
+  .mv-detail-card .modal-foot{ padding-left:16px; padding-right:16px }
+  .mv-detail-grid{ grid-template-columns:1fr; gap:12px }
+  .mv-folio-summary .fs-folio{ font-size:20px }
+}
 </style>
 </head>
 <body>
@@ -1608,7 +1861,8 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       </button>
     </div>
     <div class="filters">
-      <input type="text" id="ota-search" class="grow" placeholder="Buscar por OT, material, responsable o actividad...">
+      <input type="text" id="ota-search" class="grow" placeholder="Buscar por folio, OT, material, responsable o actividad...">
+      <input type="text" id="ota-folio" placeholder="Filtrar por folio exacto..." title="Buscar líneas que pertenecen a un folio específico" style="min-width:170px">
       <select id="ota-destino" title="Filtrar por destino">
         <option value="">Todos los destinos</option>
         <option value="KM15">KM 15</option>
@@ -1900,6 +2154,27 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         Ir a la pestaña Reservas
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============== MOVEMENT DETAIL MODAL (double-click on OT row) ============== -->
+<div class="modal-bg mv-detail-bg" id="mv-detail-modal">
+  <div class="modal-card mv-detail-card">
+    <div class="modal-h">
+      <div class="mv-detail-header-text">
+        <h3 id="mv-detail-title">Detalle del movimiento</h3>
+        <p id="mv-detail-sub"></p>
+      </div>
+      <button type="button" class="mv-detail-close" onclick="closeMovDetail()" title="Cerrar" aria-label="Cerrar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="mv-detail-body">
+      <!-- llenado dinámicamente -->
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" onclick="closeMovDetail()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -3212,11 +3487,15 @@ function filterSalidasForOta(){
   const search = (document.getElementById('ota-search').value||'').toLowerCase().trim();
   const destino = document.getElementById('ota-destino').value || '';
   const areaOrigin = document.getElementById('ota-area').value || '';
+  const folioFilter = (document.getElementById('ota-folio')?.value || '').toLowerCase().trim();
   if(destino) movs = movs.filter(m => m.destino === destino);
   if(areaOrigin) movs = movs.filter(m => m.area === areaOrigin);
+  if(folioFilter){
+    movs = movs.filter(m => (m.folio||'').toLowerCase().includes(folioFilter));
+  }
   if(search){
     movs = movs.filter(m=>{
-      const blob = `${m.material||''} ${m.sap||''} ${m.ot||''} ${m.resp||''} ${m.user||''} ${m.activity||''} ${m.notes||''} ${DEST_LABEL[m.destino]||m.destino||''} ${AREA_LABEL[m.area]||m.area||''}`.toLowerCase();
+      const blob = `${m.material||''} ${m.sap||''} ${m.ot||''} ${m.folio||''} ${m.resp||''} ${m.user||''} ${m.activity||''} ${m.notes||''} ${DEST_LABEL[m.destino]||m.destino||''} ${AREA_LABEL[m.area]||m.area||''}`.toLowerCase();
       return blob.includes(search);
     });
   }
@@ -3305,9 +3584,10 @@ function renderOtAnalysis(){
 
   out.innerHTML = sorted.map(([key, g], idx)=>{
     const lines = g.items.sort((a,b)=>b.timestamp.localeCompare(a.timestamp)).map(m=>`
-      <tr>
+      <tr class="ota-line-row" ondblclick="openMovDetail(${m.id})" title="Doble click para ver detalle del folio y movimiento">
         <td><b>${escHtml(fmtDate(m.date))}</b><br><small style="color:var(--muted);font-size:11px">${escHtml(m.timestamp ? m.timestamp.slice(11,16) : '')}</small></td>
         ${grouping !== 'ot' ? `<td>${escHtml(m.ot||'(sin OT)')}</td>` : ''}
+        <td><b>${escHtml(m.folio||'—')}</b></td>
         ${grouping !== 'material' ? `<td>${escHtml(m.material)}<br><small style="color:var(--muted);font-size:11px">${escHtml(m.sap||'')}</small></td>` : ''}
         ${grouping !== 'destino' ? `<td>${escHtml(DEST_LABEL[m.destino]||m.destino||'—')}</td>` : ''}
         <td>${escHtml(AREA_LABEL[m.area]||m.area||'—')}</td>
@@ -3322,6 +3602,7 @@ function renderOtAnalysis(){
       <tr>
         <th>Fecha</th>
         ${grouping !== 'ot' ? '<th>OT</th>' : ''}
+        <th>Folio</th>
         ${grouping !== 'material' ? '<th>Material</th>' : ''}
         ${grouping !== 'destino' ? '<th>Destino</th>' : ''}
         <th>Origen</th>
@@ -3367,8 +3648,152 @@ function renderOtAnalysis(){
 }
 window.renderOtAnalysis = renderOtAnalysis;
 
+// ---------- Movement detail modal (double-click on OT row) ----------
+// Opens a modal that shows: full data of the clicked movement, plus all
+// other lines that share the same folio (so the user sees the whole guía).
+function openMovDetail(movId){
+  const mv = state.movements.find(x=>x.id===movId);
+  if(!mv){ toast('No se encontró ese movimiento','err'); return; }
+
+  // Find sibling movements: same folio + same type (entrada/salida) + same date.
+  // Date is included so a folio number reused weeks later doesn't get mixed in.
+  const folio = (mv.folio||'').trim();
+  const siblings = folio
+    ? state.movements.filter(x =>
+        (x.folio||'').trim() === folio
+        && x.type === mv.type
+        && x.date === mv.date)
+    : [mv];   // sin folio: trate este mov como una línea solitaria
+
+  // Order siblings by timestamp (or by id if same ts) for stable display
+  siblings.sort((a,b)=>{
+    const ta = a.timestamp || '';
+    const tb = b.timestamp || '';
+    if(ta !== tb) return ta.localeCompare(tb);
+    return (a.id||0) - (b.id||0);
+  });
+
+  const totalQty = siblings.reduce((s,x)=>s+(x.qty||0), 0);
+  const isSalida = mv.type === 'salida';
+  const typeLabel = isSalida ? 'Salida' : 'Entrada';
+
+  // Build folio summary block — uses .mv-folio-summary
+  const folioBlock = folio
+    ? `<div class="mv-folio-summary">
+         <div class="fs-label">Folio</div>
+         <div class="fs-folio">${escHtml(folio)}</div>
+         <div class="fs-meta">
+           ${siblings.length} línea${siblings.length===1?'':'s'} · ${totalQty.toLocaleString('es-CL')} unid. · registrado el ${escHtml(fmtDate(mv.date))}${mv.timestamp?` a las ${escHtml(mv.timestamp.slice(11,16))}`:''}
+         </div>
+       </div>`
+    : `<div class="mv-folio-summary is-empty">
+         <div class="fs-label">Folio</div>
+         <div class="fs-folio">— sin folio registrado —</div>
+         <div class="fs-meta">Movimiento individual del ${escHtml(fmtDate(mv.date))}. Registros importados del Excel original no llevan folio.</div>
+       </div>`;
+
+  // Build header grid (datos comunes del folio) — uses .mv-cell, .mv-cell-wide, .mv-pill, .mv-pill.is-out
+  const cells = [
+    { label: 'Tipo de movimiento',
+      value: `<span class="mv-pill ${isSalida?'is-out':''}">${typeLabel}</span>` },
+    { label: isSalida ? 'Área de origen' : 'Área que recibe',
+      value: escHtml(AREA_LABEL[mv.area]||mv.area||'—') },
+  ];
+  if(isSalida){
+    cells.push({ label:'Destino', value: escHtml(DEST_LABEL[mv.destino]||mv.destino||'—') });
+    cells.push({ label:'OT / N° actividad', value: escHtml(mv.ot||'—'), mono:true });
+  }
+  cells.push({
+    label:'Responsable',
+    value: escHtml(mv.resp||'—'),
+    sub: mv.user ? `Operador: ${escHtml(mv.user)}` : ''
+  });
+  cells.push({
+    label:'Fecha',
+    value: escHtml(fmtDate(mv.date)),
+    sub: mv.timestamp ? `Hora: ${escHtml(mv.timestamp.slice(11,16))}` : ''
+  });
+  if(isSalida && mv.activity){
+    cells.push({ label:'Descripción de la actividad', value: escHtml(mv.activity), wide:true });
+  }
+  if(mv.notes){
+    cells.push({ label:'Observaciones', value: escHtml(mv.notes), wide:true });
+  }
+
+  const headerGrid = `<div class="mv-detail-grid">${
+    cells.map(c => `
+      <div class="mv-cell ${c.wide?'mv-cell-wide':''}">
+        <div class="mv-cell-label">${c.label}</div>
+        <div class="mv-cell-value ${c.mono?'mono':''}">${c.value}</div>
+        ${c.sub?`<div class="mv-cell-sub">${c.sub}</div>`:''}
+      </div>`).join('')
+  }</div>`;
+
+  // Build items table — uses .mv-section-h, .mv-items-table
+  const itemsTable = `
+    <div class="mv-section-h">
+      <span class="title">Materiales del folio</span>
+      <span class="count">${siblings.length} línea${siblings.length===1?'':'s'} · ${totalQty.toLocaleString('es-CL')} unid.</span>
+    </div>
+    <table class="mv-items-table">
+      <thead><tr>
+        <th style="width:42%">Material</th>
+        <th>SAP</th>
+        <th>Clasificación</th>
+        <th class="num">Cantidad</th>
+      </tr></thead>
+      <tbody>
+        ${siblings.map(it => {
+          const isCurrent = it.id === mv.id;
+          return `<tr class="${isCurrent?'is-current':''}">
+            <td>
+              <div class="mvi-name">${escHtml(it.material||'—')}${isCurrent?'<span class="mvi-current-badge">esta línea</span>':''}</div>
+              ${it.clasif ? `<div class="mvi-meta">${escHtml(it.clasif)}</div>` : ''}
+            </td>
+            <td><span class="mono">${escHtml(it.sap ?? '—')}</span></td>
+            <td>${escHtml(it.clasif||'—')}</td>
+            <td class="num">${(it.qty||0).toLocaleString('es-CL')}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+      <tfoot><tr>
+        <td colspan="3" style="text-align:right">Total del folio</td>
+        <td class="num">${totalQty.toLocaleString('es-CL')} unid.</td>
+      </tr></tfoot>
+    </table>`;
+
+  // Title and subtitle
+  document.getElementById('mv-detail-title').textContent =
+    folio ? `Detalle de ${typeLabel.toLowerCase()} · folio ${folio}`
+          : `Detalle de ${typeLabel.toLowerCase()}`;
+  document.getElementById('mv-detail-sub').textContent =
+    siblings.length > 1
+      ? `Este folio agrupa ${siblings.length} materiales registrados en una misma operación.`
+      : (folio ? 'Folio con un solo material.' : 'Movimiento individual sin folio.');
+
+  document.getElementById('mv-detail-body').innerHTML = folioBlock + headerGrid + itemsTable;
+  document.getElementById('mv-detail-modal').classList.add('open');
+}
+window.openMovDetail = openMovDetail;
+
+function closeMovDetail(){
+  document.getElementById('mv-detail-modal').classList.remove('open');
+}
+window.closeMovDetail = closeMovDetail;
+
+// Close detail modal when clicking on backdrop or pressing Esc
+document.getElementById('mv-detail-modal').addEventListener('click', e=>{
+  if(e.target.id === 'mv-detail-modal') closeMovDetail();
+});
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape'){
+    const md = document.getElementById('mv-detail-modal');
+    if(md && md.classList.contains('open')) closeMovDetail();
+  }
+});
+
 // Wire filters
-['ota-search','ota-destino','ota-area','ota-group'].forEach(id=>{
+['ota-search','ota-folio','ota-destino','ota-area','ota-group'].forEach(id=>{
   const el = document.getElementById(id);
   if(el) el.addEventListener('input', renderOtAnalysis);
 });
