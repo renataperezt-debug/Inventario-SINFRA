@@ -1742,25 +1742,9 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
     <form id="form-reserva" autocomplete="off">
       <div class="form-grid">
 
-        <div class="field field-full">
-          <label>Material <span class="req">*</span></label>
-          <div class="msearch">
-            <input type="text" id="rsv-search" placeholder="Buscar por nombre o código SAP..." autocomplete="off">
-            <div class="msearch-results" id="rsv-results"></div>
-          </div>
-          <div id="rsv-selected"></div>
-        </div>
-
-        <div class="field field-full">
-          <label>Área desde donde se reservará <span class="req">*</span></label>
-          <div class="area-pick" id="rsv-areas"></div>
-        </div>
-
         <div class="field">
-          <label>Cantidad a reservar <span class="req">*</span></label>
-          <input type="number" id="rsv-qty" min="0.01" step="any" inputmode="decimal" placeholder="Ej. 5">
-          <span class="field-hint" id="rsv-qty-hint"></span>
-          <span class="field-err" id="rsv-qty-err"></span>
+          <label>OT / N° Actividad <span class="req">*</span></label>
+          <input type="text" id="rsv-ot" placeholder="Ej. OT-12345">
         </div>
 
         <div class="field">
@@ -1769,20 +1753,47 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
           <span class="field-hint">Cuándo se necesitará el material físicamente.</span>
         </div>
 
-        <div class="field">
-          <label>Responsable que retirará <small style="color:var(--muted);font-weight:400;font-size:11px">(opcional)</small></label>
-          <input type="text" id="rsv-resp" placeholder="Nombre del trabajador (opcional)">
-          <span class="field-hint">Puedes dejarlo vacío. Se exigirá al momento de la salida.</span>
-        </div>
-
-        <div class="field">
-          <label>OT / N° Actividad <span class="req">*</span></label>
-          <input type="text" id="rsv-ot" placeholder="Ej. OT-12345">
-        </div>
-
         <div class="field field-full">
           <label>Descripción de la actividad</label>
           <input type="text" id="rsv-act" placeholder="Ej. Mantención bomba 3 - cambio de válvula">
+        </div>
+
+        <div class="field field-full">
+          <label>Área desde donde se reservará <span class="req">*</span></label>
+          <div class="area-pick" id="rsv-areas"></div>
+        </div>
+
+        <div class="field field-full">
+          <label>Destino (a dónde irá el material) <span class="req">*</span></label>
+          <div class="dest-pick" id="rsv-destinos"></div>
+          <span class="field-hint">Selecciona dónde se va a usar el material reservado.</span>
+        </div>
+
+        <div class="field field-full">
+          <label>Materiales del folio <span class="req">*</span></label>
+          <div class="folio-picker">
+            <div class="folio-pick-search">
+              <div class="msearch">
+                <input type="text" id="rsv-search" placeholder="Buscar material por nombre o código SAP..." autocomplete="off">
+                <div class="msearch-results" id="rsv-results"></div>
+              </div>
+              <div id="rsv-selected"></div>
+            </div>
+            <div class="folio-pick-qty">
+              <input type="number" id="rsv-qty" min="0.01" step="any" inputmode="decimal" placeholder="Cantidad">
+              <span class="field-hint" id="rsv-qty-hint"></span>
+              <span class="field-err" id="rsv-qty-err"></span>
+            </div>
+            <button type="button" class="btn-add-item" onclick="addRsvItem()">+ Agregar al folio</button>
+          </div>
+          <div id="rsv-items" class="folio-items-list"></div>
+          <span class="field-hint">Si la cantidad pedida supera el stock disponible, igual se reserva — pero saldrá una <b>alerta de compra urgente</b>.</span>
+        </div>
+
+        <div class="field field-full">
+          <label>Responsable que retirará <small style="color:var(--muted);font-weight:400;font-size:11px">(opcional)</small></label>
+          <input type="text" id="rsv-resp" placeholder="Nombre del trabajador (opcional)">
+          <span class="field-hint">Puedes dejarlo vacío. Se exigirá al momento de la salida.</span>
         </div>
 
         <div class="field field-full">
@@ -3153,8 +3164,21 @@ function renderReservaAreaPicker(){
     <div class="opt"><strong>${escHtml(a.label)}</strong><small>${escHtml(a.sub)}</small></div>
   </label>`).join('');
   c.querySelectorAll('input[type=radio]').forEach(r=>{
-    r.addEventListener('change', ()=>{ updateRsvQtyHint(); refreshRsvSelectedCard(); });
+    r.addEventListener('change', ()=>{
+      updateRsvQtyHint();
+      refreshRsvSelectedCard();
+      if(typeof renderRsvItems === 'function') renderRsvItems();
+    });
   });
+
+  // Destino picker (same DESTINOS as salida)
+  const dest = document.getElementById('rsv-destinos');
+  if(dest){
+    dest.innerHTML = DESTINOS.map(d=>`<label>
+      <input type="radio" name="rsv-destino" value="${d.key}">
+      <div class="opt">${escHtml(d.label)}</div>
+    </label>`).join('');
+  }
 }
 
 // ----- Search for reserva (similar to salida) -----
@@ -3330,62 +3354,181 @@ function updateRsvQtyHint(){
   hint.innerHTML = `Stock en ${AREA_LABEL[area]}: <b>${stock}</b> · Ya reservado: <b style="color:${reserved>0?'#B45309':'var(--muted)'}">${reserved}</b> · Disponible para reservar: <b style="color:${avail<=0?'var(--red)':'var(--teal-d)'}">${avail}</b>`;
 }
 
+// ---------- RESERVA (multi-material por OT, como salida) ----------
+
+// In-memory list of items being added to the current reservation OT/folio.
+// Each item: { matId, sap, material, clasif, qty, urgentPurchase }
+let rsvFolioItems = [];
+
+function renderRsvItems(){
+  const ct = document.getElementById('rsv-items');
+  if(!ct) return;
+  if(!rsvFolioItems.length){
+    ct.innerHTML = '';
+    return;
+  }
+  const area = document.querySelector('#rsv-areas input:checked')?.value;
+  // Recompute urgentPurchase flag dynamically based on current available stock
+  const accum = {};
+  for(const it of rsvFolioItems){ accum[it.matId] = (accum[it.matId]||0) + it.qty; }
+
+  const totalQty = rsvFolioItems.reduce((s,it)=>s+it.qty, 0);
+  let totalUrgent = 0;
+
+  const rows = rsvFolioItems.map((it, idx)=>{
+    const mat = state.materials.find(x=>x.id===it.matId);
+    const availHere = (mat && area) ? getAvailableQty(mat, area) : null;
+    const totalForMat = accum[it.matId];
+    const overStock = (availHere !== null) && totalForMat > availHere;
+    if(overStock) totalUrgent++;
+    it.urgentPurchase = overStock;
+    const warn = overStock
+      ? `<span class="fi-stock-warn" title="La cantidad solicitada supera el disponible en ${escHtml(AREA_LABEL[area])}. Se reservará igual y se generará alerta de compra urgente.">⚠ compra urgente (${availHere} disp.)</span>`
+      : '';
+    return `<tr>
+      <td>
+        <div class="fi-name">${escHtml(it.material)}</div>
+        <div class="fi-sap">${escHtml(it.clasif)} · SAP ${escHtml(it.sap ?? '—')}</div>
+      </td>
+      <td class="fi-qty">${fmtQty(it.qty)}${warn}</td>
+      <td style="width:50px;text-align:center">
+        <button type="button" class="fi-rm" onclick="removeRsvItem(${idx})" title="Quitar este material del folio">×</button>
+      </td>
+    </tr>`;
+  }).join('');
+  const urgentRow = totalUrgent > 0
+    ? `<tr><td colspan="3" style="background:var(--red-l);color:var(--red);font-weight:600;text-align:center">⚠ ${totalUrgent} material${totalUrgent===1?'':'es'} con compra urgente</td></tr>`
+    : '';
+  ct.innerHTML = `<table class="folio-items-table">
+    <thead><tr><th>Material</th><th style="text-align:right">Cantidad</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      ${urgentRow}
+      <tr>
+        <td><strong>${rsvFolioItems.length}</strong> material${rsvFolioItems.length===1?'':'es'} en este folio</td>
+        <td class="fi-qty"><strong>${fmtQty(totalQty)}</strong> unid.</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>`;
+}
+
+function addRsvItem(){
+  const m = getRsvSelectedMat();
+  const qty = parseFloat(document.getElementById('rsv-qty').value);
+  const area = document.querySelector('#rsv-areas input:checked')?.value;
+  document.getElementById('rsv-qty-err').textContent = '';
+  if(!m){ toast('Selecciona un material primero','err'); return; }
+  if(!qty || qty<=0){ toast('Ingresa una cantidad válida','err'); return; }
+  if(!area){ toast('Selecciona primero el área desde donde se reservará','err'); return; }
+  // Soft warning if exceeds stock — does NOT block
+  const avail = getAvailableQty(m, area);
+  const previouslyAddedSameMat = rsvFolioItems
+    .filter(x=>x.matId===m.id)
+    .reduce((s,x)=>s+x.qty, 0);
+  if(qty + previouslyAddedSameMat > avail){
+    toast(`⚠ Aviso: se agregó ${fmtQty(qty)} pero solo hay ${fmtQty(avail)} disponibles en ${AREA_LABEL[area]}. Quedará marcado como COMPRA URGENTE al confirmar.`, 'warn', 5500);
+  }
+  rsvFolioItems.push({
+    matId: m.id, sap: m.sap, material: m.material, clasif: m.clasif, qty,
+    urgentPurchase: false  // se recomputa en renderRsvItems
+  });
+  renderRsvItems();
+  clearRsvSel();
+  document.getElementById('rsv-search').value = '';
+  document.getElementById('rsv-qty').value = '';
+  document.getElementById('rsv-qty-hint').textContent = '';
+  document.getElementById('rsv-search').focus();
+}
+window.addRsvItem = addRsvItem;
+
+function removeRsvItem(idx){
+  if(idx >= 0 && idx < rsvFolioItems.length){
+    rsvFolioItems.splice(idx, 1);
+    renderRsvItems();
+  }
+}
+window.removeRsvItem = removeRsvItem;
+
 // ----- Form submit -----
 const _formReserva = document.getElementById('form-reserva');
 if(_formReserva){
   _formReserva.addEventListener('submit', e=>{
     e.preventDefault();
-    const m = getRsvSelectedMat();
     const area = document.querySelector('#rsv-areas input:checked')?.value;
-    const qty = parseFloat(document.getElementById('rsv-qty').value);
+    const destino = document.querySelector('#rsv-destinos input:checked')?.value;
     const due = document.getElementById('rsv-due').value || '';
     const resp = document.getElementById('rsv-resp').value.trim();
     const ot = document.getElementById('rsv-ot').value.trim();
     const activity = document.getElementById('rsv-act').value.trim();
     const notes = document.getElementById('rsv-notes').value.trim();
 
-    if(!m){ toast('Selecciona un material','err'); return; }
-    if(!area){ toast('Selecciona el área desde donde reservar','err'); return; }
-    if(!qty || qty<=0){ toast('Ingresa una cantidad válida','err'); return; }
     if(!ot){ toast('Indica la OT o N° de actividad','err'); return; }
-
-    const avail = getAvailableQty(m, area);
-    if(qty > avail){
-      document.getElementById('rsv-qty-err').textContent =
-        `No alcanza. Disponible en ${AREA_LABEL[area]}: ${avail} (stock ${m.stock[area]||0} − ya reservado ${getReservedQty(m.id, area)})`;
-      toast(`Solo hay ${avail} disponibles para reservar en ${AREA_LABEL[area]}`,'err',4500);
+    if(!area){ toast('Selecciona el área desde donde reservar','err'); return; }
+    if(!destino){ toast('Selecciona el destino del material','err'); return; }
+    if(!rsvFolioItems.length){
+      toast('Agrega al menos un material al folio','err');
       return;
     }
 
-    const newRsv = {
-      id: state.nextReservationId++,
-      matId: m.id,
-      sap: m.sap,
-      material: m.material,
-      clasif: m.clasif,
-      area,
-      qty,
-      dueDate: due,
-      timestamp: new Date().toISOString(),
-      user: state.user || '—',
-      resp, ot, activity, notes,
-      status: 'active',
-      fulfilledAt: null,
-      fulfilledBy: null,
-      fulfilledMovId: null,
-      cancelledAt: null,
-      cancelledBy: null,
-      cancelReason: '',
-    };
-    state.reservations.push(newRsv);
-    saveState();
+    // Recompute urgent flag and total
+    const accum = {};
+    for(const it of rsvFolioItems){ accum[it.matId] = (accum[it.matId]||0) + it.qty; }
+    const ts = new Date().toISOString();
+    let totalQty = 0;
+    let urgentCount = 0;
+    const createdRsvs = [];
 
-    // Sync hook
-    if(typeof syncPushEvent === 'function' && typeof buildReservationEvent === 'function'){
-      try{ syncPushEvent(buildReservationEvent('reservation_created', newRsv)); }catch(e){}
+    // Generate one reservation row per item, all sharing the same OT/destino/datos comunes
+    for(const it of rsvFolioItems){
+      const mat = state.materials.find(x=>x.id===it.matId);
+      if(!mat) continue;
+      const availHere = getAvailableQty(mat, area);
+      const totalForMat = accum[it.matId];
+      const overStock = totalForMat > availHere;
+      const newRsv = {
+        id: state.nextReservationId++,
+        matId: mat.id,
+        sap: mat.sap,
+        material: mat.material,
+        clasif: mat.clasif,
+        area, destino,
+        qty: it.qty,
+        dueDate: due,
+        timestamp: ts,
+        user: state.user || '—',
+        resp, ot, activity, notes,
+        status: 'active',
+        urgentPurchase: overStock,
+        fulfilledAt: null,
+        fulfilledBy: null,
+        fulfilledMovId: null,
+        cancelledAt: null,
+        cancelledBy: null,
+        cancelReason: '',
+      };
+      state.reservations.push(newRsv);
+      createdRsvs.push(newRsv);
+      totalQty += it.qty;
+      if(overStock) urgentCount++;
     }
 
-    toast(`Reserva creada: ${qty} unid. de ${m.material} en ${AREA_LABEL[area]}`, 'ok', 3500);
+    saveState();
+
+    // Sync hook (per reservation)
+    if(typeof syncPushEvent === 'function' && typeof buildReservationEvent === 'function'){
+      for(const r of createdRsvs){
+        try{ syncPushEvent(buildReservationEvent('reservation_created', r)); }catch(e){}
+      }
+    }
+
+    const baseMsg = `Reserva creada: OT ${ot} · ${createdRsvs.length} material${createdRsvs.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`;
+    if(urgentCount > 0){
+      toast(`${baseMsg}\n⚠ ${urgentCount} material${urgentCount===1?'':'es'} marcado${urgentCount===1?'':'s'} como COMPRA URGENTE (sin stock suficiente).`, 'warn', 7000);
+    } else {
+      toast(baseMsg, 'ok', 4500);
+    }
+
     resetReserva();
     renderReservasTable();
     if(document.getElementById('view-inventario').classList.contains('active')) renderInventario();
@@ -3399,6 +3542,8 @@ function resetReserva(){
   document.getElementById('rsv-qty-hint').textContent = '';
   document.getElementById('rsv-qty-err').textContent = '';
   clearRsvSel();
+  rsvFolioItems = [];
+  renderRsvItems();
 }
 window.resetReserva = resetReserva;
 
