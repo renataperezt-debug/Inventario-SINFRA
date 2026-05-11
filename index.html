@@ -1131,7 +1131,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       </div>
       <div class="login-text">
         <strong>SINFRA</strong>
-        <small>Infraestructura · División Andina</small>
+        <small>Infraestructura · División El Teniente</small>
       </div>
     </div>
     <h2 class="login-title">Sistema de Inventario de Materiales</h2>
@@ -1424,6 +1424,11 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         </div>
 
         <div class="field field-full">
+          <label>Fecha</label>
+          <input type="date" id="ent-date">
+        </div>
+
+        <div class="field field-full">
           <label>Área que recibe <span class="req">*</span></label>
           <div class="area-pick" id="ent-areas"></div>
         </div>
@@ -1439,7 +1444,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
               <div id="ent-selected"></div>
             </div>
             <div class="folio-pick-qty">
-              <input type="number" id="ent-qty" min="1" step="1" placeholder="Cantidad">
+              <input type="number" id="ent-qty" min="0.01" step="any" inputmode="decimal" placeholder="Cantidad">
             </div>
             <button type="button" class="btn-add-item" onclick="addEntItem()">+ Agregar al folio</button>
           </div>
@@ -1447,12 +1452,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
           <span class="field-hint">¿No encuentras el material? Pide al encargado que lo cree desde la pestaña <b>Crear material</b>.</span>
         </div>
 
-        <div class="field">
-          <label>Fecha</label>
-          <input type="date" id="ent-date">
-        </div>
-
-        <div class="field">
+        <div class="field field-full">
           <label>Responsable que recibe <span class="req">*</span></label>
           <input type="text" id="ent-resp" placeholder="Nombre apellido">
         </div>
@@ -1493,6 +1493,21 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
           <span class="field-hint">Número del folio físico (guía, vale, papel) que respalda esta salida. Todos los materiales que agregues abajo se registrarán bajo este mismo folio.</span>
         </div>
 
+        <div class="field">
+          <label>OT / N° Actividad <span class="req">*</span></label>
+          <input type="text" id="sal-ot" placeholder="Ej. OT-12345">
+        </div>
+
+        <div class="field">
+          <label>Fecha</label>
+          <input type="date" id="sal-date">
+        </div>
+
+        <div class="field field-full">
+          <label>Descripción de la actividad</label>
+          <input type="text" id="sal-act" placeholder="Ej. Mantención bomba 3 - cambio de válvula">
+        </div>
+
         <div class="field field-full">
           <label>Área que entrega (de donde sale el material) <span class="req">*</span></label>
           <div class="area-pick" id="sal-areas"></div>
@@ -1515,7 +1530,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
               <div id="sal-selected"></div>
             </div>
             <div class="folio-pick-qty">
-              <input type="number" id="sal-qty" min="1" step="1" placeholder="Cantidad">
+              <input type="number" id="sal-qty" min="0.01" step="any" inputmode="decimal" placeholder="Cantidad">
               <span class="field-hint" id="sal-qty-hint"></span>
               <span class="field-err" id="sal-qty-err"></span>
             </div>
@@ -1524,24 +1539,9 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
           <div id="sal-items" class="folio-items-list"></div>
         </div>
 
-        <div class="field">
-          <label>Fecha</label>
-          <input type="date" id="sal-date">
-        </div>
-
-        <div class="field">
+        <div class="field field-full">
           <label>Responsable que retira <span class="req">*</span></label>
           <input type="text" id="sal-resp" placeholder="Nombre del trabajador">
-        </div>
-
-        <div class="field">
-          <label>OT / N° Actividad <span class="req">*</span></label>
-          <input type="text" id="sal-ot" placeholder="Ej. OT-12345">
-        </div>
-
-        <div class="field field-full">
-          <label>Descripción de la actividad</label>
-          <input type="text" id="sal-act" placeholder="Ej. Mantención bomba 3 - cambio de válvula">
         </div>
 
         <div class="field field-full">
@@ -1758,7 +1758,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
 
         <div class="field">
           <label>Cantidad a reservar <span class="req">*</span></label>
-          <input type="number" id="rsv-qty" min="1" step="1" placeholder="Ej. 5">
+          <input type="number" id="rsv-qty" min="0.01" step="any" inputmode="decimal" placeholder="Ej. 5">
           <span class="field-hint" id="rsv-qty-hint"></span>
           <span class="field-err" id="rsv-qty-err"></span>
         </div>
@@ -2331,15 +2331,32 @@ const AREA_LABEL = Object.fromEntries(AREAS.map(a=>[a.key,a.label]));
 // Notar: KM 15 y Reactivos son áreas Y destinos (transferencia entre áreas).
 // El resto son solo destinos (lugares de uso).
 const DESTINOS = [
-  {key:'KM15',      label:'KM 15'},
-  {key:'Reactivos', label:'Reactivos'},
-  {key:'PMFC',      label:'PMFC'},
-  {key:'Ch3',       label:'Ch 3°'},
-  {key:'Ch4',       label:'Ch 4°'},
-  {key:'Nodo3500',  label:'Nodo 3500'},
-  {key:'Nodo3700',  label:'Nodo 3700'},
+  {key:'KM15',           label:'KM 15'},
+  {key:'Reactivos',      label:'Reactivos'},
+  {key:'PMFC',           label:'PMFC'},
+  {key:'Ch3',            label:'Ch 3°'},
+  {key:'Ch4',            label:'Ch 4°'},
+  {key:'Nodo3500',       label:'Nodo 3500'},
+  {key:'Nodo3700',       label:'Nodo 3700'},
+  {key:'SAG',            label:'SAG'},
+  {key:'MUN1',           label:'MUN 1'},
+  {key:'MUN2',           label:'MUN 2'},
+  {key:'Convencional',   label:'Convencional'},
+  {key:'Flotacion',      label:'Flotación'},
+  {key:'CAL',            label:'CAL'},
 ];
 const DEST_LABEL = Object.fromEntries(DESTINOS.map(d=>[d.key,d.label]));
+
+// Quantity formatter — integers shown as 1.234, decimals trimmed to 2 places (avoids
+// 0.30000000000000004 from float math). Used in any qty display that may now be decimal.
+function fmtQty(q){
+  if(q === null || q === undefined || isNaN(q)) return '0';
+  const n = Number(q);
+  if(Number.isInteger(n)) return n.toLocaleString('es-CL');
+  // Round to 2 decimals and strip trailing zeros
+  const rounded = Math.round(n * 100) / 100;
+  return rounded.toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
 
 // ---------- STATE ----------
 let state = loadState();
@@ -2801,7 +2818,7 @@ function renderEntItems(){
         <div class="fi-name">${escHtml(it.material)}</div>
         <div class="fi-sap">${escHtml(it.clasif)} · SAP ${escHtml(it.sap ?? '—')}</div>
       </td>
-      <td class="fi-qty">${it.qty}</td>
+      <td class="fi-qty">${fmtQty(it.qty)}</td>
       <td style="width:50px;text-align:center">
         <button type="button" class="fi-rm" onclick="removeEntItem(${idx})" title="Quitar este material del folio">×</button>
       </td>
@@ -2811,7 +2828,7 @@ function renderEntItems(){
     <tbody>${rows}</tbody>
     <tfoot><tr>
       <td><strong>${entFolioItems.length}</strong> material${entFolioItems.length===1?'':'es'} en este folio</td>
-      <td class="fi-qty"><strong>${totalQty}</strong> unid.</td>
+      <td class="fi-qty"><strong>${fmtQty(totalQty)}</strong> unid.</td>
       <td></td>
     </tr></tfoot>
   </table>`;
@@ -2819,7 +2836,7 @@ function renderEntItems(){
 
 function addEntItem(){
   const m = getSelectedMat('ent');
-  const qty = parseInt(document.getElementById('ent-qty').value);
+  const qty = parseFloat(document.getElementById('ent-qty').value);
   if(!m){ toast('Selecciona un material primero','err'); return; }
   if(!qty || qty<=0){ toast('Ingresa una cantidad válida','err'); return; }
   entFolioItems.push({
@@ -2875,7 +2892,7 @@ document.getElementById('form-entrada').addEventListener('submit', e=>{
     totalQty += it.qty;
   }
   saveState();
-  toast(`Entrada registrada: folio ${folio} · ${entFolioItems.length} material${entFolioItems.length===1?'':'es'} · ${totalQty} unid. → ${AREA_LABEL[area]}`, 'ok', 4500);
+  toast(`Entrada registrada: folio ${folio} · ${entFolioItems.length} material${entFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. → ${AREA_LABEL[area]}`, 'ok', 4500);
   resetEntrada();
 });
 
@@ -2912,14 +2929,14 @@ function renderSalItems(){
     const totalForThisMat = accum[it.matId];
     const overstocked = (stockHere !== null) && totalForThisMat > stockHere;
     const warn = overstocked
-      ? `<span class="fi-stock-warn" title="La suma de este material en el folio supera el stock disponible en ${escHtml(AREA_LABEL[area])}">excede stock (${stockHere} disp.)</span>`
+      ? `<span class="fi-stock-warn" title="La suma de este material en el folio supera el stock disponible en ${escHtml(AREA_LABEL[area])}">excede stock (${fmtQty(stockHere)} disp.)</span>`
       : '';
     return `<tr>
       <td>
         <div class="fi-name">${escHtml(it.material)}</div>
         <div class="fi-sap">${escHtml(it.clasif)} · SAP ${escHtml(it.sap ?? '—')}</div>
       </td>
-      <td class="fi-qty">${it.qty}${warn}</td>
+      <td class="fi-qty">${fmtQty(it.qty)}${warn}</td>
       <td style="width:50px;text-align:center">
         <button type="button" class="fi-rm" onclick="removeSalItem(${idx})" title="Quitar este material del folio">×</button>
       </td>
@@ -2930,7 +2947,7 @@ function renderSalItems(){
     <tbody>${rows}</tbody>
     <tfoot><tr>
       <td><strong>${salFolioItems.length}</strong> material${salFolioItems.length===1?'':'es'} en este folio</td>
-      <td class="fi-qty"><strong>${totalQty}</strong> unid.</td>
+      <td class="fi-qty"><strong>${fmtQty(totalQty)}</strong> unid.</td>
       <td></td>
     </tr></tfoot>
   </table>`;
@@ -2938,7 +2955,7 @@ function renderSalItems(){
 
 function addSalItem(){
   const m = getSelectedMat('sal');
-  const qty = parseInt(document.getElementById('sal-qty').value);
+  const qty = parseFloat(document.getElementById('sal-qty').value);
   const area = document.querySelector('#sal-areas input:checked')?.value;
   document.getElementById('sal-qty-err').textContent = '';
   if(!m){ toast('Selecciona un material primero','err'); return; }
@@ -2950,7 +2967,7 @@ function addSalItem(){
     .filter(x=>x.matId===m.id)
     .reduce((s,x)=>s+x.qty, 0);
   if(qty + previouslyAddedSameMat > avail){
-    toast(`Aviso: con esta línea se suman ${qty + previouslyAddedSameMat} unid., pero hay solo ${avail} disponibles en ${AREA_LABEL[area]}. Se agregó igual; revísalo antes de confirmar.`, 'warn', 5000);
+    toast(`Aviso: con esta línea se suman ${fmtQty(qty + previouslyAddedSameMat)} unid., pero hay solo ${fmtQty(avail)} disponibles en ${AREA_LABEL[area]}. Se agregó igual; revísalo antes de confirmar.`, 'warn', 5000);
   }
   salFolioItems.push({
     matId: m.id, sap: m.sap, material: m.material, clasif: m.clasif, qty
@@ -3081,8 +3098,8 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
 
   toast(
     fulfilledRsv
-      ? `Salida confirmada y reserva #${fulfilledRsv.id} cumplida: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${totalQty} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`
-      : `Salida registrada: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${totalQty} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`,
+      ? `Salida confirmada y reserva #${fulfilledRsv.id} cumplida: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`
+      : `Salida registrada: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`,
     'ok', 4500);
   resetSalida();
 });
@@ -3320,7 +3337,7 @@ if(_formReserva){
     e.preventDefault();
     const m = getRsvSelectedMat();
     const area = document.querySelector('#rsv-areas input:checked')?.value;
-    const qty = parseInt(document.getElementById('rsv-qty').value);
+    const qty = parseFloat(document.getElementById('rsv-qty').value);
     const due = document.getElementById('rsv-due').value || '';
     const resp = document.getElementById('rsv-resp').value.trim();
     const ot = document.getElementById('rsv-ot').value.trim();
