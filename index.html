@@ -569,20 +569,22 @@ tr.deleted-row .tag,tr.deleted-row b{text-decoration:line-through}
 }
 
 /* Inventario — highlight selected location column.
-   Columns: 1 Clasif | 2 Material | 3 SAP | 4 KM15 | 5 Reactivos | 6 Nivel17 | 7 Vent | 8 Total | 9 Estado | 10 acciones */
+   Columns: 1 Clasif | 2 Material | 3 SAP | 4 KM15 | 5 Reactivos | 6 PMFC | 7 Nivel17 | 8 Vent | 9 Total | 10 Reservado | 11 Disponible | 12 Estado | 13 acciones */
 #inv-tbl.hl-KM15 td:nth-child(4),         #inv-tbl.hl-KM15 th:nth-child(4),
 #inv-tbl.hl-Reactivos td:nth-child(5),    #inv-tbl.hl-Reactivos th:nth-child(5),
-#inv-tbl.hl-Nivel17 td:nth-child(6),      #inv-tbl.hl-Nivel17 th:nth-child(6),
-#inv-tbl.hl-Ventiladores td:nth-child(7), #inv-tbl.hl-Ventiladores th:nth-child(7){
+#inv-tbl.hl-PMFC td:nth-child(6),         #inv-tbl.hl-PMFC th:nth-child(6),
+#inv-tbl.hl-Nivel17 td:nth-child(7),      #inv-tbl.hl-Nivel17 th:nth-child(7),
+#inv-tbl.hl-Ventiladores td:nth-child(8), #inv-tbl.hl-Ventiladores th:nth-child(8){
   background:#FFF4EB;
   font-weight:700;
   color:#B23F00;
 }
 /* Dim non-selected area columns slightly so the eye focuses on the chosen one */
-#inv-tbl.hl-KM15 td:nth-child(5),         #inv-tbl.hl-KM15 td:nth-child(6),         #inv-tbl.hl-KM15 td:nth-child(7),
-#inv-tbl.hl-Reactivos td:nth-child(4),    #inv-tbl.hl-Reactivos td:nth-child(6),    #inv-tbl.hl-Reactivos td:nth-child(7),
-#inv-tbl.hl-Nivel17 td:nth-child(4),      #inv-tbl.hl-Nivel17 td:nth-child(5),      #inv-tbl.hl-Nivel17 td:nth-child(7),
-#inv-tbl.hl-Ventiladores td:nth-child(4), #inv-tbl.hl-Ventiladores td:nth-child(5), #inv-tbl.hl-Ventiladores td:nth-child(6){
+#inv-tbl.hl-KM15 td:nth-child(5),         #inv-tbl.hl-KM15 td:nth-child(6),         #inv-tbl.hl-KM15 td:nth-child(7),         #inv-tbl.hl-KM15 td:nth-child(8),
+#inv-tbl.hl-Reactivos td:nth-child(4),    #inv-tbl.hl-Reactivos td:nth-child(6),    #inv-tbl.hl-Reactivos td:nth-child(7),    #inv-tbl.hl-Reactivos td:nth-child(8),
+#inv-tbl.hl-PMFC td:nth-child(4),         #inv-tbl.hl-PMFC td:nth-child(5),         #inv-tbl.hl-PMFC td:nth-child(7),         #inv-tbl.hl-PMFC td:nth-child(8),
+#inv-tbl.hl-Nivel17 td:nth-child(4),      #inv-tbl.hl-Nivel17 td:nth-child(5),      #inv-tbl.hl-Nivel17 td:nth-child(6),      #inv-tbl.hl-Nivel17 td:nth-child(8),
+#inv-tbl.hl-Ventiladores td:nth-child(4), #inv-tbl.hl-Ventiladores td:nth-child(5), #inv-tbl.hl-Ventiladores td:nth-child(6), #inv-tbl.hl-Ventiladores td:nth-child(7){
   color:#B6BCC4;
 }
 
@@ -1833,7 +1835,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       <table class="t" id="inv-tbl">
         <thead><tr>
           <th>Clasif.</th><th>Material</th><th>SAP</th>
-          <th class="num">KM 15</th><th class="num">Reactivos</th><th class="num">Nivel 17</th><th class="num">Vent.</th>
+          <th class="num">KM 15</th><th class="num">Reactivos</th><th class="num">PMFC</th><th class="num">Nivel 17</th><th class="num">Vent.</th>
           <th class="num">Total</th>
           <th class="num" title="Cantidad reservada (apartada para OT futuras)">Reservado</th>
           <th class="num" title="Stock total menos reservado">Disponible</th>
@@ -2294,7 +2296,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       Sube una nueva versión de la planilla Excel para sincronizar el inventario completo:
       <br><br>
       ✔ Reemplaza el <b>catálogo</b> de materiales (Clasificación, Material, SAP, Crítico).<br>
-      ✔ Reemplaza el <b>stock</b> por área (Real KM 15, Reactivos, Nivel 17, Ventiladores).<br>
+      ✔ Reemplaza el <b>stock</b> por área (Real KM 15, Reactivos, PMFC, Nivel 17, Ventiladores).<br>
       ✔ Regenera el <b>historial importado</b> (entradas y salidas acumuladas por área) con campos en blanco.<br>
       ✔ <b>Conserva</b> los movimientos y reservas que tú hayas registrado manualmente en el sistema.
       <br><br>
@@ -2313,7 +2315,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
     <div class="card-h" style="color:var(--red)">Zona peligrosa</div>
         <p style="color:var(--muted);font-size:14px;margin:0 0 14px">
       <b>Borrar movimientos:</b> elimina el historial de entradas y salidas, pero deja el stock actual de cada material intacto.<br>
-      <b>Dejar todo en CERO:</b> elimina movimientos y reservas, y pone el stock en 0 en las cuatro áreas (KM 15, Reactivos, Nivel 17, Ventiladores) para todos los materiales del catálogo. El catálogo se conserva.<br>
+      <b>Dejar todo en CERO:</b> elimina movimientos y reservas, y pone el stock en 0 en las cuatro áreas (KM 15, Reactivos, PMFC, Nivel 17, Ventiladores) para todos los materiales del catálogo. El catálogo se conserva.<br>
       Ambas son <b>irreversibles</b> y afectan a todos los usuarios. Exporta un respaldo antes.
     </p>
     <div class="actions">
@@ -5690,6 +5692,7 @@ function topMaterials(movs, n){
 const AREA_COLORS = {
   KM15:        '#E55302', // orange (primary)
   Reactivos:   '#0098AA', // teal
+  PMFC:        '#7E22CE', // purple
   Nivel17:     '#F4AA00', // yellow
   Ventiladores:'#7A2531', // burgundy
 };
@@ -5988,7 +5991,7 @@ function renderInventario(){
 
   // Toggle highlight class on table to dim non-selected area columns
   const tbl = document.getElementById('inv-tbl');
-  tbl.classList.remove('hl-KM15','hl-Reactivos','hl-Nivel17','hl-Ventiladores');
+  tbl.classList.remove('hl-KM15','hl-Reactivos','hl-PMFC','hl-Nivel17','hl-Ventiladores');
   if(areaFil) tbl.classList.add('hl-'+areaFil);
 
   // Count: when area filter is active, also show subtotal of stock in that area
@@ -6729,12 +6732,12 @@ function exportExcelFull(){
   const wb = XLSX.utils.book_new();
 
   // Sheet 1: Stock por área (now includes specs)
-  const stockHdr = ['Clasificación','Material','SAP','Unidad','Marca','Modelo','Medidas','Stock KM 15','Stock Reactivos','Stock Nivel 17','Stock Ventiladores','Stock Total','Estado','Especificaciones'];
+  const stockHdr = ['Clasificación','Material','SAP','Unidad','Marca','Modelo','Medidas','Stock KM 15','Stock Reactivos','Stock PMFC','Stock Nivel 17','Stock Ventiladores','Stock Total','Estado','Especificaciones'];
   const stockRows = state.materials.map(m=>{
     const t = AREA_KEYS.reduce((s,k)=>s+(m.stock[k]||0),0);
     const sp = m.specs||{};
     return [m.clasif, m.material, m.sap||'', sp.unidad||'', sp.marca||'', sp.modelo||'', sp.medidas||'',
-            m.stock.KM15||0, m.stock.Reactivos||0, m.stock.Nivel17||0, m.stock.Ventiladores||0, t,
+            m.stock.KM15||0, m.stock.Reactivos||0, m.stock.PMFC||0, m.stock.Nivel17||0, m.stock.Ventiladores||0, t,
             m.critico||'ok', sp.descripcion||''];
   });
   const ws1 = XLSX.utils.aoa_to_sheet([stockHdr, ...stockRows]);
@@ -6880,10 +6883,10 @@ function exportDashboardExcel(){
   XLSX.utils.book_append_sheet(wb, ws3, 'Movimientos del período');
 
   // Sheet 4: Stock por área (snapshot)
-  const stockHdr = ['Clasificación','Material','SAP','Stock KM 15','Stock Reactivos','Stock Nivel 17','Stock Ventiladores','Stock Total','Estado'];
+  const stockHdr = ['Clasificación','Material','SAP','Stock KM 15','Stock Reactivos','Stock PMFC','Stock Nivel 17','Stock Ventiladores','Stock Total','Estado'];
   const stockRows = state.materials.map(m=>{
     const t = AREA_KEYS.reduce((s,k)=>s+(m.stock[k]||0),0);
-    return [m.clasif,m.material,m.sap||'',m.stock.KM15||0,m.stock.Reactivos||0,m.stock.Nivel17||0,m.stock.Ventiladores||0,t,m.critico||'ok'];
+    return [m.clasif,m.material,m.sap||'',m.stock.KM15||0,m.stock.Reactivos||0,m.stock.PMFC||0,m.stock.Nivel17||0,m.stock.Ventiladores||0,t,m.critico||'ok'];
   });
   const ws4 = XLSX.utils.aoa_to_sheet([stockHdr, ...stockRows]);
   ws4['!cols'] = [{wch:14},{wch:42},{wch:11},{wch:11},{wch:13},{wch:12},{wch:13},{wch:11},{wch:11}];
@@ -7112,7 +7115,7 @@ document.getElementById('cfg-import').addEventListener('change', async e=>{
     const PLACEHOLDER = 'Sin información extraída desde este Excel';
     const newImported = [];
     let nextId = userMovs.reduce((mx,m)=>Math.max(mx, m.id||0), 0) + 1;
-    const areas = ['KM15','Reactivos','Nivel17','Ventiladores'];
+    const areas = ['KM15','Reactivos','PMFC','Nivel17','Ventiladores'];
 
     // Helper: ISO week start date for 2026
     function isoWeekStart(year, week){
@@ -7380,7 +7383,7 @@ async function askResetAll(){
     return;
   }
   const ok = await confirmDialog('Dejar todo en CERO',
-    `Se borrarán los ${state.movements.length} movimientos y las ${(state.reservations||[]).length} reservas, y el stock de los ${state.materials.length} materiales del catálogo se pondrá en CERO en todas las áreas (KM 15, Reactivos, Nivel 17, Ventiladores) — LOCAL Y EN SUPABASE.\n\nEl catálogo de materiales se conserva. Esta acción es irreversible y afecta a todos los usuarios.`,
+    `Se borrarán los ${state.movements.length} movimientos y las ${(state.reservations||[]).length} reservas, y el stock de los ${state.materials.length} materiales del catálogo se pondrá en CERO en todas las áreas (KM 15, Reactivos, PMFC, Nivel 17, Ventiladores) — LOCAL Y EN SUPABASE.\n\nEl catálogo de materiales se conserva. Esta acción es irreversible y afecta a todos los usuarios.`,
     'Sí, dejar todo en cero', true);
   if(!ok) return;
 
@@ -8690,7 +8693,7 @@ function chatSend(e){
 
 // --------- UTIL ---------
 function chatN(v){ return (typeof v === 'number' && !isNaN(v)) ? v : 0; }
-function chatTot(m){ return chatN(m.stock.KM15)+chatN(m.stock.Reactivos)+chatN(m.stock.Nivel17)+chatN(m.stock.Ventiladores); }
+function chatTot(m){ return chatN(m.stock.KM15)+chatN(m.stock.Reactivos)+chatN(m.stock.PMFC)+chatN(m.stock.Nivel17)+chatN(m.stock.Ventiladores); }
 function chatNorm(s){
   return (s||'').toString().toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -8727,7 +8730,7 @@ function chatSearch(query, limit){
 function chatFmtMat(m){
   const t = chatTot(m);
   const tag = m.critico==='Critico' ? ' ⚠ CRÍTICO' : '';
-  return `📦 ${m.material}${tag}\n   Clasif: ${m.clasif} · SAP: ${m.sap||'—'}\n   KM15:${chatN(m.stock.KM15)} · React:${chatN(m.stock.Reactivos)} · N17:${chatN(m.stock.Nivel17)} · Vent:${chatN(m.stock.Ventiladores)} · Total:${t}`;
+  return `📦 ${m.material}${tag}\n   Clasif: ${m.clasif} · SAP: ${m.sap||'—'}\n   KM15:${chatN(m.stock.KM15)} · React:${chatN(m.stock.Reactivos)} · PMFC:${chatN(m.stock.PMFC)} · N17:${chatN(m.stock.Nivel17)} · Vent:${chatN(m.stock.Ventiladores)} · Total:${t}`;
 }
 
 // =============================================================
@@ -8787,7 +8790,7 @@ function chatLocalRespond(q){
       '',
       '1. Pestaña "Entrada"',
       '2. Busca el material por nombre, SAP o clasificación',
-      '3. Selecciona el área que recibe (KM 15, Reactivos, Nivel 17, Ventiladores)',
+      '3. Selecciona el área que recibe (KM 15, Reactivos, PMFC, Nivel 17, Ventiladores)',
       '4. Cantidad recibida',
       '5. Responsable',
       '6. Opcional: documento (factura/guía) y notas',
@@ -8865,7 +8868,7 @@ function chatLocalRespond(q){
     return [
       '📦 PMFC',
       '',
-      'Es una taller de almacenamiento del sistema SINFRA. Funciona igual que KM 15, Reactivos, Nivel 17 y Ventiladores: tiene su propio stock que se acumula cuando recibe material por transferencia.',
+      'Es una taller de almacenamiento del sistema SINFRA. Funciona igual que KM 15, Reactivos, PMFC, Nivel 17 y Ventiladores: tiene su propio stock que se acumula cuando recibe material por transferencia.',
       '',
       `Estado actual en PMFC: ${chatFmt(pmfcStock)} unidades en ${pmfcMatsCount} materiales.`,
       '',
@@ -8945,8 +8948,8 @@ function chatLocalRespond(q){
   let am = nlq.match(/(en|de|stock de|stock en|hay en|que hay en|materiales en)\s+(km\s*15|km15|reactivos|nivel\s*17|n17|ventiladores|vent)/i);
   if(am){
     const a = am[2].replace(/\s+/g,'');
-    const map = {'km15':'KM15','km 15':'KM15','reactivos':'Reactivos','nivel17':'Nivel17','n17':'Nivel17','ventiladores':'Ventiladores','vent':'Ventiladores'};
-    const key = map[a.toLowerCase()] || (a.toLowerCase().includes('km')?'KM15':a.toLowerCase().includes('react')?'Reactivos':a.toLowerCase().includes('niv')?'Nivel17':'Ventiladores');
+    const map = {'km15':'KM15','km 15':'KM15','reactivos':'Reactivos','pmfc':'PMFC','nivel17':'Nivel17','n17':'Nivel17','ventiladores':'Ventiladores','vent':'Ventiladores'};
+    const key = map[a.toLowerCase()] || (a.toLowerCase().includes('km')?'KM15':a.toLowerCase().includes('react')?'Reactivos':a.toLowerCase().includes('pmfc')?'PMFC':a.toLowerCase().includes('niv')?'Nivel17':'Ventiladores');
     const inArea = state.materials.filter(m=>chatN(m.stock[key])!==0);
     const total = inArea.reduce((s,m)=>s+chatN(m.stock[key]),0);
     let out = `${key}: ${inArea.length} materiales con movimiento, stock total ${chatFmt(total)}.\n\nTop 10:\n`;
@@ -8991,7 +8994,7 @@ function chatLocalRespond(q){
       if(any)nz++;
       if(m.critico==='Critico')crits++;
     });
-    const total = t.KM15+t.Reactivos+t.Nivel17+t.Ventiladores;
+    const total = t.KM15+t.Reactivos+t.PMFC+t.Nivel17+t.Ventiladores;
     return [
       '📊 Resumen del inventario:',
       '',
@@ -9003,6 +9006,7 @@ function chatLocalRespond(q){
       'Stock por área:',
       `  • KM 15: ${chatFmt(t.KM15)}`,
       `  • Reactivos: ${chatFmt(t.Reactivos)}`,
+      `  • PMFC: ${chatFmt(t.PMFC)}`,
       `  • Nivel 17: ${chatFmt(t.Nivel17)}`,
       `  • Ventiladores: ${chatFmt(t.Ventiladores)}`,
       '',
@@ -9099,14 +9103,14 @@ function chatBuildContext(){
 
   return [
     `Eres un asistente del sistema de inventario SINFRA · Codelco. Responde en español, de forma breve y útil.`,
-    `Áreas operativas: KM 15, Reactivos, Nivel 17, Ventiladores.`,
+    `Áreas operativas: KM 15, Reactivos, PMFC, Nivel 17, Ventiladores.`,
     `Destinos de salida: KM 15, Reactivos, PMFC, Ch 3°, Ch 4°, Nodo 3500, Nodo 3700.`,
     ``,
     `Estado actual:`,
     `- Total materiales en catálogo: ${ms.length}`,
     `- Con stock ≠ 0: ${ms.filter(m=>chatTot(m)!==0).length}`,
     `- Críticos: ${crits.length}`,
-    `- Stock total: KM15=${t.KM15}, Reactivos=${t.Reactivos}, Nivel17=${t.Nivel17}, Ventiladores=${t.Ventiladores}`,
+    `- Stock total: KM15=${t.KM15}, Reactivos=${t.Reactivos}, PMFC=${t.PMFC}, Nivel17=${t.Nivel17}, Ventiladores=${t.Ventiladores}`,
     `- Movimientos registrados: ${(state.movements||[]).length}`,
     ``,
     `Clasificaciones (${classifications.length}): ${classifications.slice(0,40).join(', ')}${classifications.length>40?'...':''}`,
@@ -9489,11 +9493,13 @@ function sbReservationToRow(r){
   };
 }
 function sbRowToReservation(r){
-  // Map DB state → local status convention used by UI filters
+  // Map DB state → local status convention used by UI filters.
+  // DEFENSIVE: if state is null/empty/unknown, treat as cancelled (not active)
+  // so orphan rows from old tests don't appear as active reservations.
   const localStatus = r.state === 'pendiente' ? 'active'
                     : r.state === 'fulfilled' ? 'fulfilled'
                     : r.state === 'cancelled' ? 'cancelled'
-                    : 'active';
+                    : 'cancelled';
   return {
     id: r.client_id,
     matId: r.mat_id,
