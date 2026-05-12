@@ -8809,6 +8809,12 @@ function sbRowToMovement(r){
 }
 
 function sbReservationToRow(r){
+  // Map local status (active/fulfilled/cancelled) → DB state (pendiente/fulfilled/cancelled)
+  const dbState = r.state
+    || (r.status === 'active'    ? 'pendiente'
+      : r.status === 'fulfilled' ? 'fulfilled'
+      : r.status === 'cancelled' ? 'cancelled'
+      : 'pendiente');
   return {
     client_id: r.id,
     mat_id: r.matId || null,
@@ -8817,18 +8823,30 @@ function sbReservationToRow(r){
     clasif: r.clasif || null,
     area: r.area || null,
     qty: Number(r.qty) || 0,
-    requested_by: r.requestedBy || null,
+    requested_by: r.requestedBy || r.resp || null,
     requested_for: r.requestedFor || null,
     due_date: r.dueDate || null,
-    state: r.state || 'pendiente',
+    state: dbState,
     notes: r.notes || null,
     ts: r.timestamp || null,
     fulfilled_at: r.fulfilledAt || null,
     cancelled_at: r.cancelledAt || null,
     device_id: SB_DEVICE_ID,
+    // Campos agregados para el nuevo modelo multi-material con destino y urgencia
+    destino: r.destino || null,
+    ot: r.ot || null,
+    activity: r.activity || null,
+    resp: r.resp || null,
+    user_name: r.user || null,
+    urgent_purchase: !!r.urgentPurchase,
   };
 }
 function sbRowToReservation(r){
+  // Map DB state → local status convention used by UI filters
+  const localStatus = r.state === 'pendiente' ? 'active'
+                    : r.state === 'fulfilled' ? 'fulfilled'
+                    : r.state === 'cancelled' ? 'cancelled'
+                    : 'active';
   return {
     id: r.client_id,
     matId: r.mat_id,
@@ -8841,10 +8859,23 @@ function sbRowToReservation(r){
     requestedFor: r.requested_for || '',
     dueDate: r.due_date || '',
     state: r.state || 'pendiente',
+    status: localStatus,           // <-- esto es lo que el UI filtra
     notes: r.notes || '',
     timestamp: r.ts || '',
     fulfilledAt: r.fulfilled_at || null,
     cancelledAt: r.cancelled_at || null,
+    // Campos nuevos (pueden venir null si la fila es vieja)
+    destino: r.destino || '',
+    ot: r.ot || '',
+    activity: r.activity || '',
+    resp: r.resp || r.requested_by || '',
+    user: r.user_name || '',
+    urgentPurchase: !!r.urgent_purchase,
+    // Compat back: algunos lugares del código leen estos
+    fulfilledBy: null,
+    fulfilledMovId: null,
+    cancelledBy: null,
+    cancelReason: '',
   };
 }
 
@@ -9201,6 +9232,9 @@ function sbRsvSig(r){
     rb: r.requestedBy||null, rf: r.requestedFor||null, dd: r.dueDate||null,
     st: r.status||r.state||null, n: r.notes||null,
     fa: r.fulfilledAt||null, ca: r.cancelledAt||null,
+    // Campos nuevos
+    de: r.destino||null, ot: r.ot||null, ac: r.activity||null,
+    rp: r.resp||null, us: r.user||null, up: !!r.urgentPurchase,
   });
 }
 
