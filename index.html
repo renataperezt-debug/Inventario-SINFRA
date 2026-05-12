@@ -3760,9 +3760,14 @@ function renderReservasTable(){
           <button class="tbl-edit" onclick="convertReservaToSalida(${r.id})" title="Convertir esta reserva en una salida (entrega del material)">→ Salida</button>
           <button class="tbl-edit" style="border-color:var(--red-l);color:var(--red)" onclick="cancelReservation(${r.id})" title="Cancelar esta reserva">✕ Cancelar</button>
         </div>`
-      : (r.status==='fulfilled' && r.fulfilledMovId
-          ? `<small style="color:var(--muted)">Mov. #${r.fulfilledMovId}</small>`
-          : '');
+      : r.status==='cancelled'
+        ? `<button class="btn-delete" onclick="deleteReservation(${r.id})" title="Eliminar definitivamente esta reserva cancelada (también la borra de Supabase)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+            Eliminar
+          </button>`
+        : (r.fulfilledMovId
+            ? `<small style="color:var(--muted)">Mov. #${r.fulfilledMovId}</small>`
+            : '');
 
     return `<tr class="${r.status!=='active'?'rsv-inactive':''}">
       <td>${escHtml(created)}<br><small style="color:${dueOverdue?'var(--red)':'var(--muted)'};font-size:11px">para ${dueHtml}</small></td>
@@ -4442,6 +4447,45 @@ async function cancelReservation(id){
   if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
 }
 window.cancelReservation = cancelReservation;
+
+// ----- Delete reservation permanently (only cancelled allowed) -----
+async function deleteReservation(id){
+  const r = state.reservations.find(x=>x.id===id);
+  if(!r){ toast('Reserva no encontrada','err'); return; }
+  if(r.status !== 'cancelled'){
+    toast('Solo puedes eliminar reservas canceladas. Si quieres anular una reserva activa, usa "Cancelar".','err',5000);
+    return;
+  }
+  const ok = await confirmDialog(
+    '¿Eliminar definitivamente esta reserva?',
+    `Vas a eliminar de forma permanente el registro de la reserva de ${fmtQty(r.qty)} unid. de "${r.material}" (OT ${r.ot||'sin OT'}).\n\nEsta acción es irreversible y la elimina también de Supabase, así que desaparecerá del historial en todos los computadores.`,
+    'Sí, eliminar definitivamente', true);
+  if(!ok) return;
+
+  // Remove from local state
+  const idx = state.reservations.findIndex(x=>x.id===id);
+  if(idx >= 0) state.reservations.splice(idx, 1);
+
+  // Explicitly tell Supabase to delete (defensive — the watchdog would also catch it)
+  if(typeof sbDeleteReservation === 'function' && typeof sbClient !== 'undefined' && sbClient){
+    sbDeleteReservation(id);
+  }
+  // Update sync snapshot so the watchdog doesn't re-detect a "delete" event
+  if(typeof sbRsvSnapshot !== 'undefined') sbRsvSnapshot.delete(id);
+
+  saveState();
+
+  toast('Reserva eliminada definitivamente','ok',3000);
+
+  // Re-render ALL views that might show reservations
+  if(typeof renderReservasTable === 'function') renderReservasTable();
+  if(typeof renderHistorial === 'function' &&
+     document.getElementById('view-historial')?.classList.contains('active')) renderHistorial();
+  if(document.getElementById('view-inventario')?.classList.contains('active')) renderInventario();
+  if(document.getElementById('view-dashboard')?.classList.contains('active')) renderDashboard();
+  if(document.getElementById('view-ot-analysis')?.classList.contains('active') && typeof renderOtAnalysis === 'function') renderOtAnalysis();
+}
+window.deleteReservation = deleteReservation;
 
 // ----- Convert reservation to salida -----
 function convertReservaToSalida(id){
@@ -5998,7 +6042,13 @@ function renderHistorial(){
         <td>${escHtml(r.resp||'')}<br><small style="color:var(--muted)">${escHtml(r.user||'')}</small></td>
         <td>${escHtml(r.ot||'')}</td>
         <td>${escHtml(r.activity||r.notes||'')}${fulfilledLine?`<br>${fulfilledLine}`:''}</td>
-        <td><button class="tbl-edit" onclick="openReservationsModal(${r.matId})" title="Ver detalle de reservas para este material">Ver detalle</button></td>
+        <td>${r.rsvStatus === 'cancelled'
+          ? `<button class="btn-delete" onclick="deleteReservation(${r.id})" title="Eliminar definitivamente esta reserva cancelada (también la borra de Supabase)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+              Eliminar
+            </button>`
+          : `<button class="tbl-edit" onclick="openReservationsModal(${r.matId})" title="Ver detalle de reservas para este material">Ver detalle</button>`
+        }</td>
       </tr>`;
     }
     // Movement row (original layout)
