@@ -1523,7 +1523,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
 <!-- ============== ENTRADA ============== -->
 <section class="view" id="view-entrada">
   <h2 class="view-title">Registrar entrada de material</h2>
-  <p class="view-sub">Recepción desde bodega central, proveedor o transferencia. El stock se sumará al área seleccionada.</p>
+  <p class="view-sub">Recepción desde taller central, proveedor o transferencia. El stock se sumará al área seleccionada.</p>
 
   <div class="card">
 
@@ -2121,7 +2121,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         <canvas id="chart-entsal"></canvas>
       </div>
       <div class="reporte-chart-box">
-        <h4>Transferencias entre bodegas (top 8)</h4>
+        <h4>Transferencias entre talleres (top 8)</h4>
         <canvas id="chart-transfers"></canvas>
       </div>
       <div class="reporte-chart-box">
@@ -2528,9 +2528,9 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
 
 const STORAGE_KEY = 'sinfra_inv_v1';
 const AREAS = [
-  {key:'KM15',         label:'KM 15',        sub:'Bodega KM 15'},
+  {key:'KM15',         label:'KM 15',        sub:'Taller KM 15'},
   {key:'Reactivos',    label:'Reactivos',    sub:'Planta Reactivos'},
-  {key:'PMFC',         label:'PMFC',         sub:'Bodega PMFC'},
+  {key:'PMFC',         label:'PMFC',         sub:'Taller PMFC'},
   {key:'Nivel17',      label:'Nivel 17',     sub:'Mina Nivel 17'},
   {key:'Ventiladores', label:'Ventiladores', sub:'Sala Ventiladores'},
 ];
@@ -2541,7 +2541,7 @@ const AREA_LABEL = Object.fromEntries(AREAS.map(a=>[a.key,a.label]));
 // Notar: KM 15 y Reactivos son áreas Y destinos (transferencia entre áreas).
 // El resto son solo destinos (lugares de uso).
 const DESTINOS = [
-  // Lugares de almacenamiento (warehouse) — el material se queda ahí y suma al stock de esa bodega
+  // Lugares de almacenamiento (warehouse) — el material se queda ahí y suma al stock de esa taller
   {key:'KM15',           label:'KM 15',           type:'warehouse'},
   {key:'Reactivos',      label:'Reactivos',       type:'warehouse'},
   {key:'PMFC',           label:'PMFC',            type:'warehouse'},
@@ -2562,7 +2562,7 @@ const DESTINOS = [
   {key:'PlantaCloro',    label:'Planta de Cloro', type:'consumption'},
 ];
 
-// Helper: ¿el destino marcado es una bodega (transferencia) o un lugar de consumo?
+// Helper: ¿el destino marcado es una taller (transferencia) o un lugar de consumo?
 const DEST_TYPE = Object.fromEntries(DESTINOS.map(d=>[d.key, d.type]));
 function isWarehouseDest(destKey){ return DEST_TYPE[destKey] === 'warehouse'; }
 const DEST_LABEL = Object.fromEntries(DESTINOS.map(d=>[d.key,d.label]));
@@ -2975,12 +2975,12 @@ function renderAreaPickers(){
     const cs = DESTINOS.filter(d=>d.type==='consumption');
     destCt.innerHTML = `
       <div class="dest-group dest-group-wh">
-        <div class="dest-group-h"><span class="dest-pill wh">📦 Bodegas (transferencia)</span>
-          <small>El stock se mueve automáticamente desde el origen hacia la bodega destino — no necesitas registrar entrada.</small>
+        <div class="dest-group-h"><span class="dest-pill wh">📦 Talleres (transferencia)</span>
+          <small>El stock se mueve automáticamente desde el origen hacia la taller destino — no necesitas registrar entrada.</small>
         </div>
         ${wh.map(d=>`<label class="dest-wh">
           <input type="radio" name="sal-destino" value="${d.key}">
-          <div class="opt"><strong>${escHtml(d.label)}</strong><small>Bodega</small></div>
+          <div class="opt"><strong>${escHtml(d.label)}</strong><small>Taller</small></div>
         </label>`).join('')}
       </div>
       <div class="dest-group dest-group-cs">
@@ -3306,7 +3306,7 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
     for(const a of AREAS){ if(typeof mat.stock[a.key] !== 'number') mat.stock[a.key] = Number(mat.stock[a.key])||0; }
     // Descontar siempre del origen
     mat.stock[area] = (mat.stock[area]||0) - it.qty;
-    // Si el destino es bodega → también SUMAR al destino (transferencia interna)
+    // Si el destino es taller → también SUMAR al destino (transferencia interna)
     if(isTransfer){
       mat.stock[destino] = (mat.stock[destino]||0) + it.qty;
     }
@@ -3319,7 +3319,7 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
       timestamp: ts,
       user: state.user || '—',
       folio, resp, ot, activity, notes,
-      isTransfer,                   // true si destino es bodega
+      isTransfer,                   // true si destino es taller
       destType: isTransfer ? 'warehouse' : 'consumption',
     });
     totalQty += it.qty;
@@ -3353,8 +3353,8 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
   const arrow = isTransfer ? '↔' : '→';
   toast(
     fulfilledRsv
-      ? `${labelMov} confirmada y reserva #${fulfilledRsv.id} cumplida: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} ${arrow} ${DEST_LABEL[destino]}${isTransfer ? '\n📦 Stock movido automáticamente entre bodegas.' : ''}`
-      : `${labelMov} registrada: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} ${arrow} ${DEST_LABEL[destino]}${isTransfer ? '\n📦 Stock movido automáticamente entre bodegas.' : ''}`,
+      ? `${labelMov} confirmada y reserva #${fulfilledRsv.id} cumplida: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} ${arrow} ${DEST_LABEL[destino]}${isTransfer ? '\n📦 Stock movido automáticamente entre talleres.' : ''}`
+      : `${labelMov} registrada: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} ${arrow} ${DEST_LABEL[destino]}${isTransfer ? '\n📦 Stock movido automáticamente entre talleres.' : ''}`,
     'ok', isTransfer ? 5500 : 4500);
   resetSalida();
 });
@@ -3415,17 +3415,17 @@ function renderReservaAreaPicker(){
     });
   });
 
-  // Destino picker para reserva (mismo formato que salida — distingue bodega vs consumo)
+  // Destino picker para reserva (mismo formato que salida — distingue taller vs consumo)
   const dest = document.getElementById('rsv-destinos');
   if(dest){
     const wh = DESTINOS.filter(d=>d.type==='warehouse');
     const cs = DESTINOS.filter(d=>d.type==='consumption');
     dest.innerHTML = `
       <div class="dest-group dest-group-wh">
-        <div class="dest-group-h"><span class="dest-pill wh">📦 Bodegas (transferencia)</span></div>
+        <div class="dest-group-h"><span class="dest-pill wh">📦 Talleres (transferencia)</span></div>
         ${wh.map(d=>`<label class="dest-wh">
           <input type="radio" name="rsv-destino" value="${d.key}">
-          <div class="opt"><strong>${escHtml(d.label)}</strong><small>Bodega</small></div>
+          <div class="opt"><strong>${escHtml(d.label)}</strong><small>Taller</small></div>
         </label>`).join('')}
       </div>
       <div class="dest-group dest-group-cs">
@@ -4040,7 +4040,7 @@ function renderOtAnalysis(){
     const lines = g.items.sort((a,b)=>b.timestamp.localeCompare(a.timestamp)).map(m=>{
       const isTransfer = m.isTransfer || isWarehouseDest(m.destino);
       const transferBadge = isTransfer
-        ? '<span class="mv-badge-transfer" title="Transferencia entre bodegas: descontó del origen y sumó al destino automáticamente">↔ Transferencia</span>'
+        ? '<span class="mv-badge-transfer" title="Transferencia entre talleres: descontó del origen y sumó al destino automáticamente">↔ Transferencia</span>'
         : '<span class="mv-badge-consumo" title="Consumo: descontó del origen únicamente">→ Consumo</span>';
       return `<tr class="ota-line-row ${isTransfer?'is-transfer':''}" ondblclick="openMovDetail(${m.id})" title="Doble click para ver detalle del folio y movimiento">
         <td><b>${escHtml(fmtDate(m.date))}</b><br><small style="color:var(--muted);font-size:11px">${escHtml(m.timestamp ? m.timestamp.slice(11,16) : '')}</small></td>
@@ -4206,7 +4206,7 @@ function openMovDetail(movId){
         if(!isSalida) return `<span class="mv-pill">${typeLabel}</span>`;
         const isTr = mv.isTransfer || isWarehouseDest(mv.destino);
         return isTr
-          ? `<span class="mv-pill is-out" style="background:#0F766E;color:#fff">↔ Transferencia entre bodegas</span>`
+          ? `<span class="mv-pill is-out" style="background:#0F766E;color:#fff">↔ Transferencia entre talleres</span>`
           : `<span class="mv-pill is-out">→ Salida (consumo)</span>`;
       })() },
     { label: isSalida ? 'Área de origen' : 'Área que recibe',
@@ -6531,7 +6531,7 @@ function renderReportesCharts(){
     });
   }
 
-  // ---- 2. Transferencias entre bodegas (últimos 30 días) ----
+  // ---- 2. Transferencias entre talleres (últimos 30 días) ----
   const transfers = movsRec.filter(m => m.type==='salida' && (m.isTransfer || isWarehouseDest(m.destino)));
   const byPair = {};
   transfers.forEach(m => {
@@ -8585,7 +8585,7 @@ const CHAT_FAQ = [
     items: [
       '¿Cómo registro una entrada?',
       '¿Cómo registro una salida?',
-      '¿Qué es una transferencia entre bodegas?',
+      '¿Qué es una transferencia entre talleres?',
       '¿Cómo hago una reserva?',
       '¿Qué es una compra urgente?',
     ]
@@ -8596,7 +8596,7 @@ const CHAT_FAQ = [
       '¿Qué áreas existen?',
       '¿Qué es un lugar de consumo?',
       '¿Qué es PMFC?',
-      'Diferencia entre bodega y lugar de consumo',
+      'Diferencia entre taller y lugar de consumo',
     ]
   },
   {
@@ -8673,7 +8673,7 @@ function chatGreet(){
     'Materiales críticos',
     'Top 10 con más stock',
     '¿Cómo registro una entrada?',
-    '¿Qué es una transferencia entre bodegas?',
+    '¿Qué es una transferencia entre talleres?',
   ]);
 }
 function chatSend(e){
@@ -8830,11 +8830,11 @@ function chatLocalRespond(q){
       'Sirve para avisar a Adquisiciones que ese material necesita reposición. Se ve resaltado en rojo en la tabla de reservas y en el Análisis por OT.',
     ].join('\n');
   }
-  if(/transferenc|qu[eé] es.*bodeg|entre bodegas|km.*reactivos|reactivos.*km|salida.*km.*reactivos/i.test(nlq)){
+  if(/transferenc|qu[eé] es.*bodeg|entre talleres|km.*reactivos|reactivos.*km|salida.*km.*reactivos/i.test(nlq)){
     return [
-      '↔ TRANSFERENCIA ENTRE BODEGAS',
+      '↔ TRANSFERENCIA ENTRE TALLERES',
       '',
-      'Cuando registras una salida y el destino es otra BODEGA (KM 15, Reactivos o PMFC), el sistema automáticamente:',
+      'Cuando registras una salida y el destino es otra TALLER (KM 15, Reactivos o PMFC), el sistema automáticamente:',
       '  • Descuenta del área de origen',
       '  • Suma al área destino',
       '',
@@ -8843,11 +8843,11 @@ function chatLocalRespond(q){
       'Si en cambio el destino es un LUGAR DE CONSUMO (SAG, MUN 1, Ch 3, Larox, etc.), solo se descuenta del origen — el material se gasta ahí.',
     ].join('\n');
   }
-  if(/lugar.*consumo|qu[eé] es.*consumo|consumo vs|bodega vs|diferencia.*bodega/i.test(nlq)){
+  if(/lugar.*consumo|qu[eé] es.*consumo|consumo vs|taller vs|diferencia.*taller/i.test(nlq)){
     return [
       '🏗 LUGARES DE ALMACENAMIENTO vs LUGARES DE CONSUMO',
       '',
-      '📦 Lugares de almacenamiento (5 bodegas):',
+      '📦 Lugares de almacenamiento (5 talleres):',
       '  • KM 15, Reactivos, PMFC, Nivel 17, Ventiladores',
       '  • Tienen stock propio que acumula y disminuye',
       '  • Si una salida va a una de estas → se hace transferencia automática',
@@ -8865,7 +8865,7 @@ function chatLocalRespond(q){
     return [
       '📦 PMFC',
       '',
-      'Es una bodega de almacenamiento del sistema SINFRA. Funciona igual que KM 15, Reactivos, Nivel 17 y Ventiladores: tiene su propio stock que se acumula cuando recibe material por transferencia.',
+      'Es una taller de almacenamiento del sistema SINFRA. Funciona igual que KM 15, Reactivos, Nivel 17 y Ventiladores: tiene su propio stock que se acumula cuando recibe material por transferencia.',
       '',
       `Estado actual en PMFC: ${chatFmt(pmfcStock)} unidades en ${pmfcMatsCount} materiales.`,
       '',
@@ -8887,15 +8887,15 @@ function chatLocalRespond(q){
   if(/(qu[eé] (son|es) las? )?[aá]reas|qu[eé] (son|es) los destinos|cuales.*[aá]reas|que es km|qu[eé] es reactivos|qu[eé] es nivel.*17|qu[eé] es ventil/i.test(lq)){
     return [
       '📍 Hay 5 áreas con stock independiente:',
-      '  • KM 15 — bodega principal',
-      '  • Reactivos — bodega de reactivos',
-      '  • PMFC — bodega PMFC',
-      '  • Nivel 17 — bodega operacional',
+      '  • KM 15 — taller principal',
+      '  • Reactivos — taller de reactivos',
+      '  • PMFC — taller PMFC',
+      '  • Nivel 17 — taller operacional',
       '  • Ventiladores — sala de ventiladores',
       '',
       '🎯 Y los destinos de salida se dividen en:',
       '',
-      '📦 Bodegas (3) — se hace transferencia automática:',
+      '📦 Talleres (3) — se hace transferencia automática:',
       '  KM 15, Reactivos, PMFC',
       '',
       '🔧 Lugares de consumo (12) — solo se descuenta:',
@@ -9261,7 +9261,7 @@ async function chatHandle(q){
   } else if(/c[oó]mo.*entrada/i.test(lq)){
     chatRenderSuggestions(['¿Cómo registro una salida?', '¿Cómo creo un material nuevo?', '¿Qué áreas existen?']);
   } else if(/c[oó]mo.*salida/i.test(lq)){
-    chatRenderSuggestions(['¿Qué es una transferencia entre bodegas?', '¿Cómo hago una reserva?', '¿Qué es un lugar de consumo?']);
+    chatRenderSuggestions(['¿Qué es una transferencia entre talleres?', '¿Cómo hago una reserva?', '¿Qué es un lugar de consumo?']);
   } else if(/transferenc|bodeg/i.test(lq)){
     chatRenderSuggestions(['¿Qué áreas existen?', 'Materiales en KM 15', 'Materiales en PMFC']);
   } else if(/reserva/i.test(lq)){
