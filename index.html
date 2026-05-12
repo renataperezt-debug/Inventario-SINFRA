@@ -1225,6 +1225,9 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
   .mv-folio-summary .fs-folio{ font-size:20px }
 }
 </style>
+
+<!-- Chart.js for reports (loads from CDN — only used when Reportes tab is open) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 </head>
 <body>
 
@@ -1433,9 +1436,16 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
 
   <div class="donut-row">
     <div class="donut-card">
-      <div class="ch-h">Stock por área</div>
-      <div class="ch-sub">Distribución del stock total entre las 4 áreas operativas.</div>
-      <div class="donut-wrap" id="donut-area"></div>
+      <div class="ch-h" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span>Stock por área</span>
+        <span class="freq-toggle" style="display:inline-flex;gap:0;border:1px solid #CBD5E1;border-radius:6px;overflow:hidden;font-size:11px;margin-left:auto">
+          <button type="button" id="stockview-chart" class="active" style="padding:4px 10px;border:none;cursor:pointer" onclick="toggleStockView('chart')">Gráfico</button>
+          <button type="button" id="stockview-num" style="padding:4px 10px;border:none;cursor:pointer" onclick="toggleStockView('num')">Numérico</button>
+        </span>
+      </div>
+      <div class="ch-sub">Distribución del stock total entre las 5 áreas operativas.</div>
+      <div id="stockview-chart-box"><div class="donut-wrap" id="donut-area"></div></div>
+      <div id="stockview-num-box" style="display:none"><div class="area-grid" id="area-grid"></div></div>
     </div>
     <div class="donut-card">
       <div class="ch-h">Stock por clasificación</div>
@@ -1497,11 +1507,6 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       <div class="ch-sub">A dónde se está usando el material en el período. Pincha cualquier porción para ver las OTs y el detalle de cada destino.</div>
       <div class="donut-wrap" id="donut-destino"></div>
     </div>
-  </div>
-
-  <div class="card">
-    <div class="card-h">Stock actual por área</div>
-    <div class="area-grid" id="area-grid"></div>
   </div>
 
   <div class="card">
@@ -2066,6 +2071,85 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
   <p class="view-sub">Genera planillas Excel compatibles con la plantilla SINFRA original.</p>
 
   <div class="card">
+    <div class="card-h">⚠ Reportes con alertas</div>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 10px">Selecciona qué quieres revisar. Cada lista tiene su propio botón de exportar a Excel.</p>
+    <div class="alerta-selector">
+      <button class="al-pill active" data-al="urgentes" onclick="selectAlerta('urgentes')">
+        <span class="al-pill-icon">🛒</span>
+        <span class="al-pill-text"><b>Compras urgentes</b><small id="al-count-urgentes">—</small></span>
+      </button>
+      <button class="al-pill" data-al="bajos" onclick="selectAlerta('bajos')">
+        <span class="al-pill-icon">📉</span>
+        <span class="al-pill-text"><b>Stock bajo mínimo</b><small id="al-count-bajos">—</small></span>
+      </button>
+      <button class="al-pill" data-al="vencidas" onclick="selectAlerta('vencidas')">
+        <span class="al-pill-icon">⏰</span>
+        <span class="al-pill-text"><b>Reservas críticas</b><small id="al-count-vencidas">—</small></span>
+      </button>
+      <button class="al-pill" data-al="criticos" onclick="selectAlerta('criticos')">
+        <span class="al-pill-icon">🔴</span>
+        <span class="al-pill-text"><b>Materiales críticos</b><small id="al-count-criticos">—</small></span>
+      </button>
+    </div>
+
+    <!-- Header dinámico con info + botón exportar -->
+    <div class="al-content-h">
+      <div>
+        <h4 id="al-content-title" style="margin:0;font-size:15px">🛒 Compras urgentes</h4>
+        <small id="al-content-desc" style="color:var(--muted);font-size:12px"></small>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="exportAlertaActiva()" id="btn-export-al">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar a Excel
+      </button>
+    </div>
+
+    <!-- Tabla dinámica (se rellena según selección) -->
+    <div class="table-wrap">
+      <table class="t" id="al-tbl">
+        <thead id="al-tbl-head"></thead>
+        <tbody id="al-tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">📊 Gráficos de actividad (últimos 30 días)</div>
+    <div class="reportes-grid">
+      <div class="reporte-chart-box">
+        <h4>Entradas vs Salidas por área</h4>
+        <canvas id="chart-entsal"></canvas>
+      </div>
+      <div class="reporte-chart-box">
+        <h4>Transferencias entre bodegas (top 8)</h4>
+        <canvas id="chart-transfers"></canvas>
+      </div>
+      <div class="reporte-chart-box">
+        <h4>Top 10 OTs por consumo</h4>
+        <canvas id="chart-top-ots"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">🔎 Consulta histórica de stock</div>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 10px">Calcula retroactivamente el stock de un material en una fecha específica (basado en los movimientos posteriores).</p>
+    <div class="consulta-hist">
+      <div class="row">
+        <div>
+          <label for="ch-date">Fecha</label>
+          <input type="date" id="ch-date">
+        </div>
+        <div style="flex:1;min-width:200px">
+          <label for="ch-material">Material (nombre o SAP)</label>
+          <input type="text" id="ch-material" placeholder="ej: electrodos, 12345...">
+        </div>
+        <button class="btn btn-primary" onclick="runConsultaHistorica()">Consultar</button>
+      </div>
+      <div class="consulta-hist-result" id="ch-result"><i style="color:var(--muted)">Selecciona fecha + material y haz click en Consultar.</i></div>
+    </div>
+  </div>
+<div class="card">
     <div class="card-h">Exportar a Excel</div>
     <p style="color:var(--muted);font-size:14px;margin:0 0 14px">
       El archivo descargado contiene 4 hojas: <b>Stock por área</b> (con stock actual), <b>Recepcionado</b>, <b>Entregado</b> y <b>Movimientos</b> (audit log completo).
@@ -2101,6 +2185,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       </table>
     </div>
   </div>
+
 </section>
 
 <!-- ============== CONFIG ============== -->
@@ -2176,7 +2261,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
   <div class="card">
     <div class="card-h">Clave de acceso · Crear material</div>
     <p style="color:var(--muted);font-size:14px;margin:0 0 14px">
-      Define la clave que las personas autorizadas deben ingresar para crear nuevos materiales en el catálogo. Por defecto es <b>BeKa</b>; cámbiala por una propia y compártela solo con quien corresponda.
+      Define la clave que las personas autorizadas deben ingresar para crear nuevos materiales en el catálogo. Por defecto es <b>7777</b>; cámbiala por una propia y compártela solo con quien corresponda.
     </p>
     <div class="form-grid">
       <div class="field">
@@ -2376,6 +2461,11 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       <div class="field field-full" style="display:flex;align-items:center;gap:10px">
         <input type="checkbox" id="em-critic" style="width:18px;height:18px;flex:0 0 auto;margin:0">
         <label for="em-critic" style="margin:0;cursor:pointer">Marcar como material crítico</label>
+      </div>
+      <div class="field">
+        <label>Stock mínimo configurable</label>
+        <input type="number" id="em-minstock" step="any" min="0" placeholder="0 = sin alerta">
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Si el stock total cae bajo este valor, aparece en alertas. Deja en 0 para desactivar.</div>
       </div>
       <div class="field field-full" style="margin-top:6px;padding:14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);margin-bottom:4px">
@@ -2654,9 +2744,13 @@ function switchView(v){
   if(v==='dashboard') renderDashboard();
   if(v==='inventario') renderInventario();
   if(v==='historial') renderHistorial();
-  if(v==='reportes') renderReportes();
   if(v==='reservas') renderReservasTable();
   if(v==='otanalysis') renderOtAnalysis();
+  if(v==='reportes'){
+    renderReportes();
+    if(typeof renderAlertaTabla === 'function') renderAlertaTabla();
+    setTimeout(()=>{ try{ renderReportesCharts(); }catch(e){} }, 100);
+  }
   if(v==='config') ensureConfigGate();
   if(v==='nuevomat') onEnterNuevomat();
   window.scrollTo({top:0, behavior:'smooth'});
@@ -4313,7 +4407,6 @@ function goToOtAnalysis(opts){
 }
 window.goToOtAnalysis = goToOtAnalysis;
 
-
 // ----- Reservation detail modal -----
 function openReservationsModal(matId, statusFilter){
   const m = state.materials.find(x=>x.id===matId);
@@ -4421,7 +4514,6 @@ document.addEventListener('keydown', e=>{
     if(m && m.style.display === 'flex') closeReservationsModal();
   }
 });
-
 
 // ----- Cancel a reservation -----
 async function cancelReservation(id){
@@ -4567,7 +4659,6 @@ function buildReservationEvent(type, r){
 }
 window.buildReservationEvent = buildReservationEvent;
 
-
 // ---------- DEVOLUCIÓN ----------
 // (Devolución removed in v3 — no longer part of this app)
 
@@ -4706,7 +4797,6 @@ document.getElementById('form-nuevomat').addEventListener('submit', e=>{
   createNuevoMat();
 });
 
-
 // ---------- EDIT MATERIAL ----------
 let editingMatId = null;
 let editUnlocked = false;     // session-level unlock for Editar button
@@ -4733,6 +4823,7 @@ function openEditMat(matId){
   document.getElementById('em-medidas').value = sp.medidas || '';
   document.getElementById('em-desc').value = sp.descripcion || '';
   document.getElementById('em-critic').checked = !!(m.critico && m.critico.toLowerCase()!=='ok');
+  document.getElementById('em-minstock').value = Number(m.minStock) || 0;
   // Load per-area stock values
   AREA_KEYS.forEach(k => {
     const inp = document.getElementById('em-stock-'+k);
@@ -4817,6 +4908,7 @@ document.getElementById('em-save').addEventListener('click', ()=>{
     descripcion: document.getElementById('em-desc').value.trim(),
   };
   m.critico = document.getElementById('em-critic').checked ? 'Critico' : 'ok';
+  m.minStock = Number(document.getElementById('em-minstock').value) || 0;
 
   // Apply stock changes and generate adjustment movements
   if(stockChanges.length > 0){
@@ -5665,8 +5757,6 @@ function donutChart(items, opts){
   <div class="donut-legend">${legend}</div>`;
 }
 
-
-
 // ---------- DASHBOARD ----------
 function renderDashboard(){
   // KPIs
@@ -6043,10 +6133,13 @@ function renderHistorial(){
         <td>${escHtml(r.ot||'')}</td>
         <td>${escHtml(r.activity||r.notes||'')}${fulfilledLine?`<br>${fulfilledLine}`:''}</td>
         <td>${r.rsvStatus === 'cancelled'
-          ? `<button class="btn-delete" onclick="deleteReservation(${r.id})" title="Eliminar definitivamente esta reserva cancelada (también la borra de Supabase)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
-              Eliminar
-            </button>`
+          ? `<div style="display:flex;flex-direction:column;gap:4px">
+              <button class="tbl-edit" onclick="openReservationsModal(${r.matId})" title="Ver detalle de reservas para este material">Ver detalle</button>
+              <button class="btn-delete" onclick="deleteReservation(${r.id})" title="Eliminar definitivamente esta reserva cancelada (también la borra de Supabase)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                Eliminar
+              </button>
+            </div>`
           : `<button class="tbl-edit" onclick="openReservationsModal(${r.matId})" title="Ver detalle de reservas para este material">Ver detalle</button>`
         }</td>
       </tr>`;
@@ -6083,6 +6176,456 @@ function renderHistorial(){
   const el = document.getElementById(id);
   if(el) el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', renderHistorial);
 });
+
+// ============================================================
+// REPORTES — ALERTAS CON 4 CATEGORÍAS SELECCIONABLES
+// ============================================================
+
+function getMatStockTotal(m){
+  if(!m || !m.stock) return 0;
+  return AREAS.reduce((s,a)=>s + (Number(m.stock[a.key]) || 0), 0);
+}
+
+let alertaActiva = 'urgentes';   // estado global del selector
+
+function selectAlerta(which){
+  alertaActiva = which;
+  document.querySelectorAll('.al-pill').forEach(b => {
+    b.classList.toggle('active', b.dataset.al === which);
+  });
+  renderAlertaTabla();
+}
+window.selectAlerta = selectAlerta;
+
+function getAlertaData(which){
+  const today = todayStr();
+
+  if(which === 'urgentes'){
+    const urgRsvs = (state.reservations || []).filter(r => r.status==='active' && r.urgentPurchase);
+    const byMat = {};
+    urgRsvs.forEach(r => {
+      if(!byMat[r.matId]){
+        const mat = state.materials.find(x=>x.id===r.matId);
+        byMat[r.matId] = {
+          matId:r.matId, material:r.material, sap:r.sap, clasif:r.clasif,
+          rsvs:[], totalQty:0, ots:new Set(), responsables:new Set(),
+          oldest:r.timestamp, stockTotal: mat ? getMatStockTotal(mat) : 0,
+        };
+      }
+      const g = byMat[r.matId];
+      g.rsvs.push(r);
+      g.totalQty += Number(r.qty)||0;
+      if(r.ot) g.ots.add(r.ot);
+      if(r.resp) g.responsables.add(r.resp);
+      if(r.timestamp < g.oldest) g.oldest = r.timestamp;
+    });
+    const groups = Object.values(byMat).map(g=>({...g, faltante:Math.max(0,g.totalQty-g.stockTotal)}))
+                     .sort((a,b)=>a.oldest.localeCompare(b.oldest));
+    return { count: groups.length, rsvCount: urgRsvs.length, rows: groups };
+  }
+
+  if(which === 'bajos'){
+    const rows = state.materials
+      .filter(m => Number(m.minStock) > 0)
+      .map(m => ({ m, total:getMatStockTotal(m), min:Number(m.minStock)||0 }))
+      .filter(x => x.total < x.min)
+      .map(x => ({
+        ...x, deficit:x.min-x.total,
+        severidad: x.total===0 ? 'rojo' : x.total < x.min*0.5 ? 'naranjo' : 'amarillo'
+      }))
+      .sort((a,b)=>b.deficit-a.deficit);
+    return { count: rows.length, rows };
+  }
+
+  if(which === 'vencidas'){
+    const rows = (state.reservations || [])
+      .filter(r => r.status==='active' && r.dueDate)
+      .map(r => ({ r, dias: Math.floor((new Date(r.dueDate) - new Date(today)) / (1000*60*60*24)) }))
+      .filter(x => x.dias <= 3)
+      .sort((a,b)=>a.dias-b.dias);
+    return { count: rows.length, vencidas: rows.filter(x=>x.dias<0).length, rows };
+  }
+
+  if(which === 'criticos'){
+    const rows = state.materials
+      .filter(m => m.critico && m.critico.toLowerCase()!=='ok')
+      .map(m => ({ m, total: getMatStockTotal(m) }))
+      .sort((a,b)=>a.total-b.total);
+    return { count: rows.length, sinStock: rows.filter(x=>x.total===0).length, rows };
+  }
+}
+
+function renderAlertaTabla(){
+  // Update counters in pills
+  ['urgentes','bajos','vencidas','criticos'].forEach(k => {
+    const data = getAlertaData(k);
+    const el = document.getElementById('al-count-'+k);
+    if(el){
+      let txt = '';
+      if(k==='urgentes')      txt = `${data.count} material${data.count===1?'':'es'} · ${data.rsvCount} reservas`;
+      else if(k==='bajos')    txt = `${data.count} material${data.count===1?'':'es'}`;
+      else if(k==='vencidas') txt = `${data.count} reserva${data.count===1?'':'s'}` + (data.vencidas?` (${data.vencidas} vencidas)`:'');
+      else if(k==='criticos') txt = `${data.count} material${data.count===1?'':'es'}` + (data.sinStock?` (${data.sinStock} en cero)`:'');
+      el.textContent = txt;
+    }
+  });
+
+  const data = getAlertaData(alertaActiva);
+  const title = document.getElementById('al-content-title');
+  const desc  = document.getElementById('al-content-desc');
+  const head  = document.getElementById('al-tbl-head');
+  const body  = document.getElementById('al-tbl-body');
+  const btnExp = document.getElementById('btn-export-al');
+
+  btnExp.style.display = data.count ? '' : 'none';
+
+  if(alertaActiva === 'urgentes'){
+    title.textContent = '🛒 Compras urgentes';
+    desc.textContent  = 'Reservas marcadas como compra urgente, agrupadas por material. Ordenadas por antigüedad de la solicitud.';
+    head.innerHTML = `<tr>
+      <th>Material</th><th>SAP</th><th>Clasificación</th>
+      <th class="num">Faltante</th><th class="num"># Reservas</th>
+      <th>OTs</th><th>Más antigua</th><th>Responsables</th>
+    </tr>`;
+    if(!data.count){ body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">✓ No hay compras urgentes pendientes.</td></tr>'; return; }
+    body.innerHTML = data.rows.map(g => `<tr class="al-row-rojo">
+      <td><b>${escHtml(g.material)}</b></td>
+      <td class="sap">${escHtml(g.sap ?? '—')}</td>
+      <td>${escHtml(g.clasif||'—')}</td>
+      <td class="num"><b style="color:#DC2626">${fmtQty(g.faltante)}</b><br><small style="color:var(--muted);font-size:10px">de ${fmtQty(g.totalQty)} pedido</small></td>
+      <td class="num">${g.rsvs.length}</td>
+      <td>${[...g.ots].map(escHtml).join(', ')||'—'}</td>
+      <td>${escHtml(fmtDate(g.oldest.slice(0,10)))}</td>
+      <td>${[...g.responsables].map(escHtml).join(', ')||'—'}</td>
+    </tr>`).join('');
+    return;
+  }
+
+  if(alertaActiva === 'bajos'){
+    title.textContent = '📉 Stock bajo mínimo';
+    desc.textContent  = 'Materiales cuyo stock total cayó bajo el mínimo configurado. Edita el mínimo en Inventario.';
+    head.innerHTML = `<tr>
+      <th>Material</th><th>SAP</th><th>Clasificación</th>
+      <th class="num">Actual</th><th class="num">Mínimo</th><th class="num">Déficit</th><th>Estado</th>
+    </tr>`;
+    if(!data.count){ body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">✓ Todos los materiales con mínimo configurado están sobre el umbral.<br><small>Configura mínimos editando un material desde Inventario.</small></td></tr>'; return; }
+    body.innerHTML = data.rows.map(x => {
+      const cls = `al-row-${x.severidad}`;
+      const tag = x.severidad==='rojo' ? 'Sin stock' : x.severidad==='naranjo' ? 'Crítico' : 'Bajo';
+      return `<tr class="${cls}">
+        <td><b>${escHtml(x.m.material)}</b></td>
+        <td class="sap">${escHtml(x.m.sap ?? '—')}</td>
+        <td>${escHtml(x.m.clasif||'—')}</td>
+        <td class="num"><b>${fmtQty(x.total)}</b></td>
+        <td class="num">${fmtQty(x.min)}</td>
+        <td class="num"><b style="color:#DC2626">−${fmtQty(x.deficit)}</b></td>
+        <td><span class="al-tag-${x.severidad}">${tag}</span></td>
+      </tr>`;
+    }).join('');
+    return;
+  }
+
+  if(alertaActiva === 'vencidas'){
+    title.textContent = '⏰ Reservas críticas';
+    desc.innerHTML  = '<span style="color:#DC2626;font-weight:600">Rojo</span>: ya pasó la fecha esperada · <span style="color:#B45309;font-weight:600">Amarillo</span>: vence en los próximos 3 días.';
+    head.innerHTML = `<tr>
+      <th>Material</th><th>SAP</th><th class="num">Cantidad</th>
+      <th>Área</th><th>OT</th><th>Responsable</th>
+      <th>Fecha esperada</th><th>Días</th>
+    </tr>`;
+    if(!data.count){ body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">✓ Sin reservas vencidas ni próximas a vencer.</td></tr>'; return; }
+    body.innerHTML = data.rows.map(x => {
+      const r = x.r;
+      const cls = x.dias<0 ? 'al-row-rojo' : 'al-row-amarillo';
+      const tag = x.dias<0 ? `<span class="al-tag-rojo">⚠ Venció hace ${Math.abs(x.dias)}d</span>`
+                : x.dias===0 ? `<span class="al-tag-naranjo">Hoy</span>`
+                : `<span class="al-tag-amarillo">En ${x.dias}d</span>`;
+      return `<tr class="${cls}">
+        <td><b>${escHtml(r.material)}</b></td>
+        <td class="sap">${escHtml(r.sap ?? '—')}</td>
+        <td class="num"><b>${fmtQty(r.qty)}</b></td>
+        <td>${escHtml(AREA_LABEL[r.area]||r.area||'—')}</td>
+        <td>${escHtml(r.ot||'—')}</td>
+        <td>${escHtml(r.resp||'(sin asignar)')}</td>
+        <td>${escHtml(fmtDate(r.dueDate))}</td>
+        <td>${tag}</td>
+      </tr>`;
+    }).join('');
+    return;
+  }
+
+  if(alertaActiva === 'criticos'){
+    title.textContent = '🔴 Materiales críticos';
+    desc.textContent  = 'Materiales marcados como críticos en el catálogo. Ordenados por menor stock total.';
+    head.innerHTML = `<tr>
+      <th>Material</th><th>SAP</th><th>Clasificación</th>
+      <th class="num">KM 15</th><th class="num">Reactivos</th><th class="num">PMFC</th>
+      <th class="num">Nivel 17</th><th class="num">Ventiladores</th><th class="num">Total</th>
+    </tr>`;
+    if(!data.count){ body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px">No hay materiales marcados como críticos.</td></tr>'; return; }
+    body.innerHTML = data.rows.map(x => {
+      const m = x.m;
+      const cls = x.total===0 ? 'al-row-rojo' : x.total < 5 ? 'al-row-naranjo' : 'al-row-amarillo';
+      return `<tr class="${cls}">
+        <td><b>${escHtml(m.material)}</b></td>
+        <td class="sap">${escHtml(m.sap ?? '—')}</td>
+        <td>${escHtml(m.clasif||'—')}</td>
+        <td class="num">${fmtQty(m.stock?.KM15||0)}</td>
+        <td class="num">${fmtQty(m.stock?.Reactivos||0)}</td>
+        <td class="num">${fmtQty(m.stock?.PMFC||0)}</td>
+        <td class="num">${fmtQty(m.stock?.Nivel17||0)}</td>
+        <td class="num">${fmtQty(m.stock?.Ventiladores||0)}</td>
+        <td class="num"><b>${fmtQty(x.total)}</b></td>
+      </tr>`;
+    }).join('');
+    return;
+  }
+}
+window.renderAlertaTabla = renderAlertaTabla;
+
+// ===== Exportar la alerta activa a Excel =====
+function exportAlertaActiva(){
+  if(typeof XLSX === 'undefined'){ toast('Librería Excel no cargada','err'); return; }
+  const today = todayStr();
+  const data = getAlertaData(alertaActiva);
+  if(!data.count){ toast('No hay datos para exportar','warn'); return; }
+
+  const wb = XLSX.utils.book_new();
+  let rows = [];
+  let sheetName = '';
+  let filename = '';
+
+  if(alertaActiva === 'urgentes'){
+    sheetName = 'Compras Urgentes';
+    filename  = `Compras_Urgentes_SINFRA_${today}.xlsx`;
+    rows = data.rows.map(g => ({
+      Material: g.material||'',
+      SAP: g.sap||'',
+      Clasificación: g.clasif||'',
+      'Stock actual total': g.stockTotal,
+      'Cantidad solicitada': g.totalQty,
+      'Cantidad faltante': g.faltante,
+      'N° reservas': g.rsvs.length,
+      'OTs involucradas': [...g.ots].join(', '),
+      Responsables: [...g.responsables].join(', '),
+      'Solicitud más antigua': g.oldest.slice(0,10),
+    }));
+  }
+  else if(alertaActiva === 'bajos'){
+    sheetName = 'Stock bajo mínimo';
+    filename  = `Stock_Bajo_Minimo_SINFRA_${today}.xlsx`;
+    rows = data.rows.map(x => ({
+      Material: x.m.material||'',
+      SAP: x.m.sap||'',
+      Clasificación: x.m.clasif||'',
+      'Stock actual': x.total,
+      'Stock mínimo': x.min,
+      Déficit: x.deficit,
+      Severidad: x.severidad==='rojo' ? 'Sin stock' : x.severidad==='naranjo' ? 'Crítico' : 'Bajo',
+    }));
+  }
+  else if(alertaActiva === 'vencidas'){
+    sheetName = 'Reservas críticas';
+    filename  = `Reservas_Criticas_SINFRA_${today}.xlsx`;
+    rows = data.rows.map(x => {
+      const r = x.r;
+      return {
+        'ID Reserva': r.id,
+        Material: r.material||'',
+        SAP: r.sap||'',
+        Cantidad: r.qty,
+        Área: AREA_LABEL[r.area]||r.area||'',
+        Destino: DEST_LABEL[r.destino]||r.destino||'',
+        OT: r.ot||'',
+        Responsable: r.resp||'',
+        'Fecha solicitud': (r.timestamp||'').slice(0,10),
+        'Fecha esperada': r.dueDate||'',
+        'Días para vencimiento': x.dias,
+        Estado: x.dias<0 ? `Vencida hace ${Math.abs(x.dias)} días` : x.dias===0 ? 'Vence hoy' : `Vence en ${x.dias} días`,
+        Observaciones: r.notes||'',
+      };
+    });
+  }
+  else if(alertaActiva === 'criticos'){
+    sheetName = 'Materiales críticos';
+    filename  = `Materiales_Criticos_SINFRA_${today}.xlsx`;
+    rows = data.rows.map(x => ({
+      Material: x.m.material||'',
+      SAP: x.m.sap||'',
+      Clasificación: x.m.clasif||'',
+      'KM 15': x.m.stock?.KM15||0,
+      Reactivos: x.m.stock?.Reactivos||0,
+      PMFC: x.m.stock?.PMFC||0,
+      'Nivel 17': x.m.stock?.Nivel17||0,
+      Ventiladores: x.m.stock?.Ventiladores||0,
+      'Total general': x.total,
+      'Estado': x.total===0 ? 'SIN STOCK' : x.total<5 ? 'Crítico bajo' : 'Crítico',
+    }));
+  }
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  // Auto column widths
+  if(rows.length){
+    const keys = Object.keys(rows[0]);
+    ws['!cols'] = keys.map(k => ({ wch: Math.max(k.length+2, 14) }));
+  }
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0,30));
+  XLSX.writeFile(wb, filename);
+  toast(`Excel descargado: ${filename}`, 'ok', 4000);
+}
+window.exportAlertaActiva = exportAlertaActiva;
+
+// Toggle Stock por área view (chart vs numeric)
+function toggleStockView(which){
+  const chartBox = document.getElementById('stockview-chart-box');
+  const numBox = document.getElementById('stockview-num-box');
+  const btnChart = document.getElementById('stockview-chart');
+  const btnNum = document.getElementById('stockview-num');
+  if(which === 'num'){
+    chartBox.style.display = 'none';
+    numBox.style.display = '';
+    btnChart.classList.remove('active');
+    btnNum.classList.add('active');
+  } else {
+    chartBox.style.display = '';
+    numBox.style.display = 'none';
+    btnChart.classList.add('active');
+    btnNum.classList.remove('active');
+  }
+}
+window.toggleStockView = toggleStockView;
+
+// ============================================================
+// REPORTES — GRÁFICOS + CONSULTA HISTÓRICA
+// ============================================================
+
+let chartEntSal = null, chartTransfers = null, chartTopOts = null;
+
+function renderReportesCharts(){
+  if(typeof Chart === 'undefined') return;  // Chart.js todavía no cargó
+
+  // ---- 1. Entradas vs Salidas por área (últimos 30 días) ----
+  const ahora = new Date();
+  const desde = new Date(ahora); desde.setDate(desde.getDate() - 30);
+  const desdeIso = desde.toISOString().slice(0,10);
+
+  const movsRec = state.movements.filter(m => !m._adjustment && m.date >= desdeIso);
+  const datosAreas = AREAS.map(a => {
+    const ent = movsRec.filter(m => m.type==='entrada' && m.area === a.key).reduce((s,m)=>s+(m.qty||0), 0);
+    const sal = movsRec.filter(m => m.type==='salida'  && m.area === a.key).reduce((s,m)=>s+(m.qty||0), 0);
+    return { area: a.label, ent, sal };
+  });
+  const ctx1 = document.getElementById('chart-entsal');
+  if(ctx1){
+    if(chartEntSal) chartEntSal.destroy();
+    chartEntSal = new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: datosAreas.map(d=>d.area),
+        datasets: [
+          { label: 'Entradas', data: datosAreas.map(d=>d.ent), backgroundColor: '#0F766E' },
+          { label: 'Salidas',  data: datosAreas.map(d=>d.sal), backgroundColor: '#E55302' },
+        ]
+      },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+    });
+  }
+
+  // ---- 2. Transferencias entre bodegas (últimos 30 días) ----
+  const transfers = movsRec.filter(m => m.type==='salida' && (m.isTransfer || isWarehouseDest(m.destino)));
+  const byPair = {};
+  transfers.forEach(m => {
+    const key = `${AREA_LABEL[m.area]||m.area} → ${DEST_LABEL[m.destino]||m.destino}`;
+    byPair[key] = (byPair[key]||0) + (m.qty||0);
+  });
+  const pairs = Object.entries(byPair).sort((a,b)=>b[1]-a[1]).slice(0, 8);
+  const ctx2 = document.getElementById('chart-transfers');
+  if(ctx2){
+    if(chartTransfers) chartTransfers.destroy();
+    chartTransfers = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: pairs.map(p=>p[0]),
+        datasets: [{ label:'Unidades transferidas', data:pairs.map(p=>p[1]), backgroundColor:'#0098AA' }]
+      },
+      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }
+    });
+  }
+
+  // ---- 3. Top 10 OTs por consumo (últimos 30 días) ----
+  const byOt = {};
+  movsRec.filter(m => m.type==='salida' && m.ot).forEach(m => {
+    byOt[m.ot] = (byOt[m.ot]||0) + (m.qty||0);
+  });
+  const topOts = Object.entries(byOt).sort((a,b)=>b[1]-a[1]).slice(0, 10);
+  const ctx3 = document.getElementById('chart-top-ots');
+  if(ctx3){
+    if(chartTopOts) chartTopOts.destroy();
+    chartTopOts = new Chart(ctx3, {
+      type: 'bar',
+      data: {
+        labels: topOts.map(o=>o[0]),
+        datasets: [{ label:'Unidades despachadas', data:topOts.map(o=>o[1]), backgroundColor:'#E55302' }]
+      },
+      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }
+    });
+  }
+}
+window.renderReportesCharts = renderReportesCharts;
+
+// ---- Consulta histórica de stock ----
+function calcStockAtDate(matId, areaKey, dateIso){
+  const mat = state.materials.find(x=>x.id===matId);
+  if(!mat) return null;
+  // Stock actual del área
+  const stockNow = Number(mat.stock?.[areaKey]) || 0;
+  // Sumar movimientos posteriores al dateIso para "deshacerlos"
+  const after = state.movements.filter(m =>
+    m.matId === matId &&
+    !m._adjustment &&
+    m.date > dateIso &&
+    (m.area === areaKey || (m.type==='salida' && m.destino === areaKey && isWarehouseDest(m.destino)))
+  );
+  let stock = stockNow;
+  after.forEach(m => {
+    if(m.type === 'entrada' && m.area === areaKey) stock -= (m.qty||0);
+    else if(m.type === 'salida' && m.area === areaKey) stock += (m.qty||0);
+    // Si destino era esta misma área (transferencia entrante), restamos
+    else if(m.type === 'salida' && m.destino === areaKey && isWarehouseDest(m.destino)) stock -= (m.qty||0);
+  });
+  return stock;
+}
+
+function runConsultaHistorica(){
+  const dateIso = document.getElementById('ch-date').value;
+  const matSearch = document.getElementById('ch-material').value.trim().toLowerCase();
+  const out = document.getElementById('ch-result');
+  if(!dateIso){ out.innerHTML = '<i style="color:var(--muted)">Selecciona una fecha.</i>'; return; }
+  if(!matSearch){ out.innerHTML = '<i style="color:var(--muted)">Escribe parte del nombre o el SAP del material.</i>'; return; }
+
+  // Buscar material
+  const found = state.materials.filter(m =>
+    (m.material||'').toLowerCase().includes(matSearch) ||
+    String(m.sap||'').includes(matSearch)
+  ).slice(0, 5);
+
+  if(!found.length){
+    out.innerHTML = `<i style="color:var(--red)">No se encontró material que coincida con "${escHtml(matSearch)}".</i>`;
+    return;
+  }
+  out.innerHTML = found.map(mat => {
+    const rows = AREAS.map(a => {
+      const stock = calcStockAtDate(mat.id, a.key, dateIso);
+      return `<tr><td>${escHtml(a.label)}</td><td class="num"><b>${fmtQty(stock)}</b></td></tr>`;
+    }).join('');
+    return `<div style="margin-bottom:14px;padding:10px;background:var(--bg);border-radius:6px">
+      <div style="font-weight:600;margin-bottom:6px">${escHtml(mat.material)} <small style="color:var(--muted);font-weight:400">(SAP ${escHtml(mat.sap||'—')})</small></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Stock estimado al ${escHtml(fmtDate(dateIso))}:</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">${rows}</table>
+    </div>`;
+  }).join('');
+}
+window.runConsultaHistorica = runConsultaHistorica;
 
 async function deleteMov(id){
   const m = state.movements.find(x=>x.id===id);
@@ -6397,7 +6940,6 @@ function exportMovementsCSV(){
   URL.revokeObjectURL(a.href);
   toast('CSV descargado','ok');
 }
-
 
 // ---------- IMPORT CATALOG FROM EXCEL ----------
 document.getElementById('cfg-import').addEventListener('change', async e=>{
@@ -6919,6 +7461,7 @@ function refreshAll(){
   renderReservasTable();
   renderHistorial();
   renderReportes();
+  if(typeof renderAlertaTabla === 'function' && document.getElementById('view-reportes')?.classList.contains('active')) renderAlertaTabla();
   document.getElementById('hdr-user').textContent = state.user || 'Operador';
   const pinFld = document.getElementById('cfg-pin');
   if(pinFld) pinFld.value = state.nmPin || '';
@@ -7656,10 +8199,6 @@ window.forceSyncNow      = forceSyncNow;
 window.openSyncDetails   = openSyncDetails;
 window.closeSyncDetails  = closeSyncDetails;
 
-
-
-
-
 window.goToFlow = goToFlow;
 window.filterHistByMat = filterHistByMat;
 window.lockNuevoMat = lockNuevoMat;
@@ -7770,6 +8309,52 @@ window.setPeriod = setPeriod;
   background:#fff; border:1px dashed var(--line); border-radius:6px;
   font-size:11.5px; color:var(--muted); text-align:center;
 }
+
+/* ============ CENTRO DE ALERTAS ============ */
+
+/* ============ REPORTES — gráficos + histórico ============ */
+.alerta-selector{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:8px; margin-bottom:14px;
+}
+.al-pill{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; background:#fff; border:1.5px solid var(--line);
+  border-radius:10px; cursor:pointer; text-align:left;
+  font-family:inherit; transition:all .15s;
+}
+.al-pill:hover{ border-color:var(--orange); background:var(--orange-l) }
+.al-pill.active{ border-color:var(--orange); background:var(--orange-l); box-shadow:0 0 0 3px rgba(229,83,2,.1) }
+.al-pill-icon{ font-size:22px; flex:0 0 auto }
+.al-pill-text{ display:flex; flex-direction:column; gap:1px; min-width:0 }
+.al-pill-text b{ font-size:13px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.al-pill-text small{ font-size:11px; color:var(--muted) }
+.al-pill[data-al="urgentes"].active{ border-color:#DC2626; background:#FEF2F2; box-shadow:0 0 0 3px rgba(220,38,38,.1) }
+.al-pill[data-al="bajos"].active   { border-color:#F59E0B; background:#FFFBEB; box-shadow:0 0 0 3px rgba(245,158,11,.1) }
+.al-pill[data-al="vencidas"].active{ border-color:#EA580C; background:#FFF7ED; box-shadow:0 0 0 3px rgba(234,88,12,.1) }
+.al-pill[data-al="criticos"].active{ border-color:#991B1B; background:#FEF2F2; box-shadow:0 0 0 3px rgba(153,27,27,.1) }
+.al-content-h{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin:6px 0 10px; flex-wrap:wrap }
+.al-row-rojo   td{ background:#FEF2F2 }
+.al-row-amarillo td{ background:#FFFBEB }
+.al-row-naranjo td{ background:#FFF7ED }
+.al-tag-rojo   { display:inline-block; padding:2px 7px; background:#DC2626; color:#fff; border-radius:8px; font-size:10px; font-weight:600 }
+.al-tag-amarillo{ display:inline-block; padding:2px 7px; background:#F59E0B; color:#fff; border-radius:8px; font-size:10px; font-weight:600 }
+.al-tag-naranjo { display:inline-block; padding:2px 7px; background:#EA580C; color:#fff; border-radius:8px; font-size:10px; font-weight:600 }
+.btn.btn-sm{ padding:6px 12px; font-size:12px }
+
+.reportes-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); gap:16px; margin-top:14px }
+.reporte-chart-box{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px }
+.reporte-chart-box h4{ margin:0 0 10px; font-size:13px; font-weight:600; color:var(--ink); letter-spacing:.3px }
+.reporte-chart-box canvas{ max-height:240px; width:100% !important }
+.consulta-hist{ background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:14px; margin-top:14px }
+.consulta-hist h4{ margin:0 0 8px; font-size:14px; color:var(--ink) }
+.consulta-hist .row{ display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px }
+.consulta-hist label{ font-size:12px; color:var(--muted); display:block; margin-bottom:3px }
+.consulta-hist input[type=date], .consulta-hist select, .consulta-hist input[type=text]{
+  padding:7px 10px; border:1px solid var(--line); border-radius:6px; font-size:13px;
+}
+.consulta-hist-result{ background:#fff; padding:12px; border-radius:8px; border:1px solid var(--line); font-size:13px }
+
 .chat-input-wrap{
   display:flex; gap:6px; padding:10px 12px; border-top:1px solid var(--line);
   background:#fff; flex-shrink:0;
@@ -8789,6 +9374,7 @@ function sbMaterialToRow(m){
     stock_pmfc:        Number(m.stock?.PMFC)         || 0,
     stock_nivel17:     Number(m.stock?.Nivel17)      || 0,
     stock_ventiladores:Number(m.stock?.Ventiladores) || 0,
+    min_stock:         Number(m.minStock)            || 0,
     specs: m.specs || null,
     updated_at: new Date().toISOString(),
     device_id: SB_DEVICE_ID,
@@ -8808,6 +9394,7 @@ function sbRowToMaterial(r){
       Nivel17:      Number(r.stock_nivel17)      || 0,
       Ventiladores: Number(r.stock_ventiladores) || 0,
     },
+    minStock: Number(r.min_stock) || 0,
     specs: r.specs || null,
   };
 }
@@ -9000,7 +9587,7 @@ async function sbInitialLoad(){
     sbSetStatus('connecting');
 
     // Materials (paged) — request only needed columns to save egress
-    const matCols = 'client_id,clasif,material,sap,critico,stock_km15,stock_reactivos,stock_pmfc,stock_nivel17,stock_ventiladores,specs';
+    const matCols = 'client_id,clasif,material,sap,critico,stock_km15,stock_reactivos,stock_pmfc,stock_nivel17,stock_ventiladores,min_stock,specs';
     let allMats = [];
     let from = 0; const pageSize = 1000;
     while(true){
@@ -9274,8 +9861,9 @@ function sbMatSig(m){
   return JSON.stringify({
     c: m.clasif||null, m: m.material||'', s: m.sap==null?null:String(m.sap),
     cr: m.critico||'ok', sk: Number(m.stock?.KM15)||0, sr: Number(m.stock?.Reactivos)||0,
+    sf: Number(m.stock?.PMFC)||0,
     sn: Number(m.stock?.Nivel17)||0, sv: Number(m.stock?.Ventiladores)||0,
-    sp: m.specs||null,
+    sp: m.specs||null, ms: Number(m.minStock)||0,
   });
 }
 function sbMovSig(mv){
@@ -9472,7 +10060,6 @@ if(document.readyState === 'complete' || document.readyState === 'interactive'){
 
 window.sbSeedFromLocal = sbSeedFromLocal;
 </script>
-
 
 </body>
 </html>
