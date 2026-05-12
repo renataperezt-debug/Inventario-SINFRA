@@ -357,7 +357,42 @@ tr.deleted-row .tag,tr.deleted-row b{text-decoration:line-through}
 .modal h3 svg{width:20px;height:20px;vertical-align:-4px;margin-right:6px;color:var(--orange)}
 
 /* DESTINATION PICKER (smaller pills than area picker) */
-.dest-pick{display:flex;flex-wrap:wrap;gap:8px}
+.dest-pick{display:flex;flex-direction:column;gap:14px}
+.dest-group{border:1px solid var(--line);border-radius:10px;padding:12px}
+.dest-group.dest-group-wh{background:#F0FDFA;border-color:#5EEAD4}
+.dest-group.dest-group-cs{background:#FFF7ED;border-color:#FDBA74}
+.dest-group-h{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.dest-group-h small{color:var(--muted);font-size:12px;line-height:1.3}
+.dest-pill{display:inline-block;padding:4px 11px;border-radius:12px;font-size:12px;font-weight:600;letter-spacing:.3px}
+.dest-pill.wh{background:#0F766E;color:#fff}
+.dest-pill.cs{background:#9A3412;color:#fff}
+.dest-group label{flex:0 0 auto}
+.dest-group .dest-wh,.dest-group .dest-cs{display:inline-block;margin:4px 6px 4px 0}
+.dest-group .opt small{display:block;margin-top:2px;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
+.dest-wh .opt small{color:#0F766E}
+.dest-cs .opt small{color:#9A3412}
+/* radio + label visual selection (reuses existing input:checked + .opt styling, just keep consistency) */
+
+/* ---------- TRANSFER VS CONSUMPTION BADGES ---------- */
+.mv-badge-transfer{
+  display:inline-block; margin-top:3px;
+  padding:2px 7px;
+  background:#0F766E; color:#fff;
+  border-radius:9px; font-size:10px; font-weight:600;
+  letter-spacing:.3px;
+}
+.mv-badge-consumo{
+  display:inline-block; margin-top:3px;
+  padding:2px 7px;
+  background:#FFF7ED; color:#9A3412;
+  border:1px solid #FDBA74;
+  border-radius:9px; font-size:10px; font-weight:500;
+  letter-spacing:.3px;
+}
+.ota-lines tbody tr.ota-line-row.is-transfer{ background:#F0FDFA }
+.ota-lines tbody tr.ota-line-row.is-transfer:hover{ background:#CCFBF1 }
+.ota-lines tbody tr.ota-line-row.is-transfer td:first-child{ box-shadow:inset 3px 0 0 #0F766E }
+.ota-lines tbody tr.ota-line-row.is-transfer:hover td:first-child{ box-shadow:inset 3px 0 0 #0F766E }
 .dest-pick label{display:block;cursor:pointer}
 .dest-pick input{display:none}
 .dest-pick .opt{padding:9px 14px;border:1.5px solid var(--line);border-radius:30px;background:#fff;
@@ -936,6 +971,79 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
 .ota-lines tbody tr.ota-line-row{ cursor:pointer; transition:background .12s }
 .ota-lines tbody tr.ota-line-row:hover{ background:var(--bg) }
 .ota-lines tbody tr.ota-line-row:hover td:first-child{ box-shadow:inset 3px 0 0 var(--teal) }
+
+/* ---------- RESERVAS ACTIVAS within OT Analysis ---------- */
+.ota-rsv-section{
+  margin-top:14px;
+  background:#FFFBEB;
+  border:1px solid #F4D27A;
+  border-radius:10px;
+  padding:12px 14px;
+}
+.ota-rsv-section.has-urgent{
+  background:#FEF2F2;
+  border-color:#FCA5A5;
+}
+.ota-rsv-h{
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+  margin-bottom:10px;
+  padding-bottom:8px;
+  border-bottom:1px dashed #E0B962;
+}
+.ota-rsv-section.has-urgent .ota-rsv-h{ border-bottom-color:#FCA5A5 }
+.ota-rsv-pill{
+  display:inline-block; padding:3px 10px;
+  background:#B45309; color:#fff;
+  border-radius:11px; font-size:11px; font-weight:600;
+  letter-spacing:.4px;
+}
+.ota-rsv-section.has-urgent .ota-rsv-pill{ background:#DC2626 }
+.ota-rsv-title{ font-size:13px; color:var(--ink); font-weight:500 }
+.ota-rsv-urgent-tag{
+  margin-left:auto;
+  padding:3px 10px;
+  background:#DC2626; color:#fff;
+  border-radius:11px; font-size:11px; font-weight:600;
+  letter-spacing:.3px;
+  animation:rsvPulse 2s ease-in-out infinite;
+}
+@keyframes rsvPulse{
+  0%,100%{ box-shadow:0 0 0 0 rgba(220,38,38,.5) }
+  50%{ box-shadow:0 0 0 6px rgba(220,38,38,0) }
+}
+.ota-rsv-tbl{
+  width:100%; border-collapse:collapse;
+  background:#fff;
+  border:1px solid #E0B962;
+  border-radius:6px; overflow:hidden;
+  font-size:13px;
+}
+.ota-rsv-section.has-urgent .ota-rsv-tbl{ border-color:#FCA5A5 }
+.ota-rsv-tbl thead th{
+  background:#92400E; color:#fff;
+  text-align:left; padding:7px 10px;
+  font-size:11px; font-weight:500; letter-spacing:.3px; text-transform:uppercase;
+}
+.ota-rsv-section.has-urgent .ota-rsv-tbl thead th{ background:#991B1B }
+.ota-rsv-tbl thead th.num{ text-align:right }
+.ota-rsv-tbl tbody td{
+  padding:8px 10px;
+  border-top:1px solid #FDE5BA;
+  vertical-align:top;
+}
+.ota-rsv-tbl tbody tr.ota-rsv-row:hover{ background:#FDF6E3 }
+.ota-rsv-tbl tbody tr.ota-rsv-row.is-urgent{ background:#FEE2E2 }
+.ota-rsv-tbl tbody tr.ota-rsv-row.is-urgent:hover{ background:#FCA5A5 }
+.ota-rsv-tbl tbody td.num{ text-align:right; font-weight:500; white-space:nowrap }
+.ota-urgent-badge{
+  display:inline-block;
+  margin-top:4px;
+  padding:2px 6px;
+  background:#DC2626; color:#fff;
+  border-radius:8px;
+  font-size:10px; font-weight:600;
+  letter-spacing:.4px;
+}
 
 /* Folio summary block */
 .mv-folio-summary{
@@ -2332,6 +2440,7 @@ const STORAGE_KEY = 'sinfra_inv_v1';
 const AREAS = [
   {key:'KM15',         label:'KM 15',        sub:'Bodega KM 15'},
   {key:'Reactivos',    label:'Reactivos',    sub:'Planta Reactivos'},
+  {key:'PMFC',         label:'PMFC',         sub:'Bodega PMFC'},
   {key:'Nivel17',      label:'Nivel 17',     sub:'Mina Nivel 17'},
   {key:'Ventiladores', label:'Ventiladores', sub:'Sala Ventiladores'},
 ];
@@ -2342,20 +2451,30 @@ const AREA_LABEL = Object.fromEntries(AREAS.map(a=>[a.key,a.label]));
 // Notar: KM 15 y Reactivos son áreas Y destinos (transferencia entre áreas).
 // El resto son solo destinos (lugares de uso).
 const DESTINOS = [
-  {key:'KM15',           label:'KM 15'},
-  {key:'Reactivos',      label:'Reactivos'},
-  {key:'PMFC',           label:'PMFC'},
-  {key:'Ch3',            label:'Ch 3°'},
-  {key:'Ch4',            label:'Ch 4°'},
-  {key:'Nodo3500',       label:'Nodo 3500'},
-  {key:'Nodo3700',       label:'Nodo 3700'},
-  {key:'SAG',            label:'SAG'},
-  {key:'MUN1',           label:'MUN 1'},
-  {key:'MUN2',           label:'MUN 2'},
-  {key:'Convencional',   label:'Convencional'},
-  {key:'Flotacion',      label:'Flotación'},
-  {key:'CAL',            label:'CAL'},
+  // Lugares de almacenamiento (warehouse) — el material se queda ahí y suma al stock de esa bodega
+  {key:'KM15',           label:'KM 15',           type:'warehouse'},
+  {key:'Reactivos',      label:'Reactivos',       type:'warehouse'},
+  {key:'PMFC',           label:'PMFC',            type:'warehouse'},
+  {key:'Nivel17',        label:'Nivel 17',        type:'warehouse'},
+  {key:'Ventiladores',   label:'Ventiladores',    type:'warehouse'},
+  // Lugares de consumo — el material se gasta ahí, no acumula stock
+  {key:'Ch3',            label:'Ch 3°',           type:'consumption'},
+  {key:'Ch4',            label:'Ch 4°',           type:'consumption'},
+  {key:'Nodo3500',       label:'Nodo 3500',       type:'consumption'},
+  {key:'Nodo3700',       label:'Nodo 3700',       type:'consumption'},
+  {key:'SAG',            label:'SAG',             type:'consumption'},
+  {key:'MUN1',           label:'MUN 1',           type:'consumption'},
+  {key:'MUN2',           label:'MUN 2',           type:'consumption'},
+  {key:'Convencional',   label:'Convencional',    type:'consumption'},
+  {key:'Flotacion',      label:'Flotación',       type:'consumption'},
+  {key:'CAL',            label:'CAL',             type:'consumption'},
+  {key:'Larox',          label:'Larox',           type:'consumption'},
+  {key:'PlantaCloro',    label:'Planta de Cloro', type:'consumption'},
 ];
+
+// Helper: ¿el destino marcado es una bodega (transferencia) o un lugar de consumo?
+const DEST_TYPE = Object.fromEntries(DESTINOS.map(d=>[d.key, d.type]));
+function isWarehouseDest(destKey){ return DEST_TYPE[destKey] === 'warehouse'; }
 const DEST_LABEL = Object.fromEntries(DESTINOS.map(d=>[d.key,d.label]));
 
 // Quantity formatter — integers shown as 1.234, decimals trimmed to 2 places (avoids
@@ -2755,13 +2874,30 @@ function renderAreaPickers(){
       <div class="opt"><strong>${escHtml(a.label)}</strong><small>${escHtml(a.sub)}</small></div>
     </label>`).join('');
   });
-  // Render destino picker (only for Salida)
+  // Render destino picker (only for Salida) — agrupa por tipo
   const destCt = document.getElementById('sal-destinos');
   if(destCt){
-    destCt.innerHTML = DESTINOS.map(d=>`<label>
-      <input type="radio" name="sal-destino" value="${d.key}">
-      <div class="opt">${escHtml(d.label)}</div>
-    </label>`).join('');
+    const wh = DESTINOS.filter(d=>d.type==='warehouse');
+    const cs = DESTINOS.filter(d=>d.type==='consumption');
+    destCt.innerHTML = `
+      <div class="dest-group dest-group-wh">
+        <div class="dest-group-h"><span class="dest-pill wh">📦 Bodegas (transferencia)</span>
+          <small>El stock se mueve automáticamente desde el origen hacia la bodega destino — no necesitas registrar entrada.</small>
+        </div>
+        ${wh.map(d=>`<label class="dest-wh">
+          <input type="radio" name="sal-destino" value="${d.key}">
+          <div class="opt"><strong>${escHtml(d.label)}</strong><small>Bodega</small></div>
+        </label>`).join('')}
+      </div>
+      <div class="dest-group dest-group-cs">
+        <div class="dest-group-h"><span class="dest-pill cs">🔧 Lugares de consumo</span>
+          <small>El material se gasta ahí — solo se descuenta del origen.</small>
+        </div>
+        ${cs.map(d=>`<label class="dest-cs">
+          <input type="radio" name="sal-destino" value="${d.key}">
+          <div class="opt"><strong>${escHtml(d.label)}</strong><small>Consumo</small></div>
+        </label>`).join('')}
+      </div>`;
   }
   // Re-render selected display when area changes
   document.querySelectorAll('#sal-areas input, #ent-areas input').forEach(r=>{
@@ -3066,11 +3202,20 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
   const ts = new Date().toISOString();
   let totalQty = 0;
   let firstMovIdForReservation = null;
+  const isTransfer = isWarehouseDest(destino);
   // Generar un movimiento por línea del folio
   for(const it of salFolioItems){
     const mat = state.materials.find(x=>x.id===it.matId);
     if(!mat){ continue; }
+    // Asegurar shape completo del stock (por si falta PMFC en datos viejos)
+    if(typeof mat.stock !== 'object' || mat.stock === null) mat.stock = {};
+    for(const a of AREAS){ if(typeof mat.stock[a.key] !== 'number') mat.stock[a.key] = Number(mat.stock[a.key])||0; }
+    // Descontar siempre del origen
     mat.stock[area] = (mat.stock[area]||0) - it.qty;
+    // Si el destino es bodega → también SUMAR al destino (transferencia interna)
+    if(isTransfer){
+      mat.stock[destino] = (mat.stock[destino]||0) + it.qty;
+    }
     const movId = state.nextMovId++;
     state.movements.push({
       id: movId,
@@ -3080,6 +3225,8 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
       timestamp: ts,
       user: state.user || '—',
       folio, resp, ot, activity, notes,
+      isTransfer,                   // true si destino es bodega
+      destType: isTransfer ? 'warehouse' : 'consumption',
     });
     totalQty += it.qty;
     if(firstMovIdForReservation === null){ firstMovIdForReservation = movId; }
@@ -3107,11 +3254,13 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
     try{ syncPushEvent(buildReservationEvent('reservation_fulfilled', fulfilledRsv)); }catch(e){}
   }
 
+  const labelMov = isTransfer ? 'Transferencia ↔' : 'Salida';
+  const arrow = isTransfer ? '↔' : '→';
   toast(
     fulfilledRsv
-      ? `Salida confirmada y reserva #${fulfilledRsv.id} cumplida: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`
-      : `Salida registrada: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} → ${DEST_LABEL[destino]}`,
-    'ok', 4500);
+      ? `${labelMov} confirmada y reserva #${fulfilledRsv.id} cumplida: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} ${arrow} ${DEST_LABEL[destino]}${isTransfer ? '\n📦 Stock movido automáticamente entre bodegas.' : ''}`
+      : `${labelMov} registrada: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} ${arrow} ${DEST_LABEL[destino]}${isTransfer ? '\n📦 Stock movido automáticamente entre bodegas.' : ''}`,
+    'ok', isTransfer ? 5500 : 4500);
   resetSalida();
 });
 
@@ -3171,13 +3320,26 @@ function renderReservaAreaPicker(){
     });
   });
 
-  // Destino picker (same DESTINOS as salida)
+  // Destino picker para reserva (mismo formato que salida — distingue bodega vs consumo)
   const dest = document.getElementById('rsv-destinos');
   if(dest){
-    dest.innerHTML = DESTINOS.map(d=>`<label>
-      <input type="radio" name="rsv-destino" value="${d.key}">
-      <div class="opt">${escHtml(d.label)}</div>
-    </label>`).join('');
+    const wh = DESTINOS.filter(d=>d.type==='warehouse');
+    const cs = DESTINOS.filter(d=>d.type==='consumption');
+    dest.innerHTML = `
+      <div class="dest-group dest-group-wh">
+        <div class="dest-group-h"><span class="dest-pill wh">📦 Bodegas (transferencia)</span></div>
+        ${wh.map(d=>`<label class="dest-wh">
+          <input type="radio" name="rsv-destino" value="${d.key}">
+          <div class="opt"><strong>${escHtml(d.label)}</strong><small>Bodega</small></div>
+        </label>`).join('')}
+      </div>
+      <div class="dest-group dest-group-cs">
+        <div class="dest-group-h"><span class="dest-pill cs">🔧 Lugares de consumo</span></div>
+        ${cs.map(d=>`<label class="dest-cs">
+          <input type="radio" name="rsv-destino" value="${d.key}">
+          <div class="opt"><strong>${escHtml(d.label)}</strong><small>Consumo</small></div>
+        </label>`).join('')}
+      </div>`;
   }
 }
 
@@ -3706,14 +3868,7 @@ function renderOtAnalysis(){
 
   // Group results
   const out = document.getElementById('ota-results');
-  if(!movs.length){
-    out.innerHTML = `<div class="ota-empty">
-      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-      <div><b>Sin resultados.</b> Ajusta los filtros o el período para ver salidas hacia OTs.</div>
-    </div>`;
-    document.getElementById('ota-results-title').textContent = 'Resultados';
-    return;
-  }
+  // (empty check moved below after virtual rsv-only groups added)
 
   // Build grouping
   const groups = {};  // key → { label, sub, items: [] }
@@ -3737,7 +3892,43 @@ function renderOtAnalysis(){
     groups[key].total += (m.qty||0);
   });
 
+  // When grouping by OT, add virtual groups for OTs that have only active reservations
+  // (no salidas yet), so the user sees them too.
+  if(grouping === 'ot' && Array.isArray(state.reservations)){
+    const folioFilter = (document.getElementById('ota-folio')?.value || '').toLowerCase().trim();
+    const search = (document.getElementById('ota-search').value||'').toLowerCase().trim();
+    state.reservations
+      .filter(r => r.status === 'active' && r.ot)
+      .forEach(r => {
+        if(!groups[r.ot]){
+          // Apply soft filters analogous to filterSalidasForOta — only inclusion criteria
+          if(folioFilter) return;   // folio filter is salida-only, skip rsvs entirely if active
+          if(search){
+            const blob = `${r.material||''} ${r.sap||''} ${r.ot||''} ${r.resp||''} ${r.activity||''} ${r.notes||''} ${DEST_LABEL[r.destino]||r.destino||''} ${AREA_LABEL[r.area]||r.area||''}`.toLowerCase();
+            if(!blob.includes(search)) return;
+          }
+          groups[r.ot] = {
+            label: r.ot,
+            sub: r.activity ? escHtml(r.activity).slice(0,80) : '(solo con reservas activas)',
+            items: [],
+            total: 0,
+            _onlyReservations: true
+          };
+        }
+      });
+  }
+
   const sorted = Object.entries(groups).sort((a,b)=>b[1].total - a[1].total);
+
+  // Empty check after rsv-only groups were possibly injected
+  if(!sorted.length){
+    out.innerHTML = `<div class="ota-empty">
+      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      <div><b>Sin resultados.</b> Ajusta los filtros o el período para ver salidas o reservas hacia OTs.</div>
+    </div>`;
+    document.getElementById('ota-results-title').textContent = 'Resultados';
+    return;
+  }
 
   document.getElementById('ota-results-title').textContent =
     `${sorted.length} ${grouping === 'ot' ? (sorted.length===1?'OT':'OTs') :
@@ -3745,19 +3936,23 @@ function renderOtAnalysis(){
                        (sorted.length===1?'material':'materiales')} · ${totalQty.toLocaleString('es-CL')} unid.`;
 
   out.innerHTML = sorted.map(([key, g], idx)=>{
-    const lines = g.items.sort((a,b)=>b.timestamp.localeCompare(a.timestamp)).map(m=>`
-      <tr class="ota-line-row" ondblclick="openMovDetail(${m.id})" title="Doble click para ver detalle del folio y movimiento">
+    const lines = g.items.sort((a,b)=>b.timestamp.localeCompare(a.timestamp)).map(m=>{
+      const isTransfer = m.isTransfer || isWarehouseDest(m.destino);
+      const transferBadge = isTransfer
+        ? '<span class="mv-badge-transfer" title="Transferencia entre bodegas: descontó del origen y sumó al destino automáticamente">↔ Transferencia</span>'
+        : '<span class="mv-badge-consumo" title="Consumo: descontó del origen únicamente">→ Consumo</span>';
+      return `<tr class="ota-line-row ${isTransfer?'is-transfer':''}" ondblclick="openMovDetail(${m.id})" title="Doble click para ver detalle del folio y movimiento">
         <td><b>${escHtml(fmtDate(m.date))}</b><br><small style="color:var(--muted);font-size:11px">${escHtml(m.timestamp ? m.timestamp.slice(11,16) : '')}</small></td>
         ${grouping !== 'ot' ? `<td>${escHtml(m.ot||'(sin OT)')}</td>` : ''}
         <td><b>${escHtml(m.folio||'—')}</b></td>
         ${grouping !== 'material' ? `<td>${escHtml(m.material)}<br><small style="color:var(--muted);font-size:11px">${escHtml(m.sap||'')}</small></td>` : ''}
-        ${grouping !== 'destino' ? `<td>${escHtml(DEST_LABEL[m.destino]||m.destino||'—')}</td>` : ''}
+        ${grouping !== 'destino' ? `<td>${escHtml(DEST_LABEL[m.destino]||m.destino||'—')}<br>${transferBadge}</td>` : `<td>${transferBadge}</td>`}
         <td>${escHtml(AREA_LABEL[m.area]||m.area||'—')}</td>
         <td class="num">${m.qty}</td>
         <td>${escHtml(m.resp||'—')}<br><small style="color:var(--muted);font-size:11px">Operador: ${escHtml(m.user||'—')}</small></td>
         <td>${escHtml(m.activity||m.notes||'—')}</td>
-      </tr>
-    `).join('');
+      </tr>`;
+    }).join('');
 
     // Header columns
     const headerCols = `
@@ -3766,12 +3961,60 @@ function renderOtAnalysis(){
         ${grouping !== 'ot' ? '<th>OT</th>' : ''}
         <th>Folio</th>
         ${grouping !== 'material' ? '<th>Material</th>' : ''}
-        ${grouping !== 'destino' ? '<th>Destino</th>' : ''}
+        ${grouping !== 'destino' ? '<th>Destino · Tipo</th>' : '<th>Tipo</th>'}
         <th>Origen</th>
         <th class="num">Cant.</th>
         <th>Responsable</th>
         <th>Actividad / Notas</th>
       </tr>`;
+
+    // === Reservas activas asociadas (solo cuando agrupamos por OT) ===
+    let reservasBlock = '';
+    if(grouping === 'ot' && key !== '(sin OT)'){
+      const rsvActivas = (state.reservations || []).filter(r =>
+        r.status === 'active' && r.ot === key
+      );
+      if(rsvActivas.length){
+        const urgentCount = rsvActivas.filter(r => r.urgentPurchase).length;
+        const totalRsvQty = rsvActivas.reduce((s,r)=>s+(r.qty||0),0);
+        const rsvRows = rsvActivas.sort((a,b)=>(b.timestamp||'').localeCompare(a.timestamp||'')).map(r=>{
+          const urgent = !!r.urgentPurchase;
+          return `<tr class="ota-rsv-row ${urgent?'is-urgent':''}">
+            <td><b>${escHtml(fmtDate(r.timestamp ? r.timestamp.slice(0,10) : ''))}</b>
+                <br><small style="color:var(--muted);font-size:11px">${escHtml(r.timestamp ? r.timestamp.slice(11,16) : '')}</small></td>
+            <td>${escHtml(r.material||'')}
+                <br><small style="color:var(--muted);font-size:11px">${escHtml(r.sap||'')}</small></td>
+            <td>${escHtml(DEST_LABEL[r.destino]||r.destino||'—')}</td>
+            <td>${escHtml(AREA_LABEL[r.area]||r.area||'—')}</td>
+            <td class="num"><b>${fmtQty(r.qty)}</b>${urgent?'<br><span class="ota-urgent-badge">⚠ COMPRA URGENTE</span>':''}</td>
+            <td>${escHtml(r.resp||'(sin asignar)')}</td>
+            <td>${r.dueDate ? `<small>Para: <b>${escHtml(fmtDate(r.dueDate))}</b></small>` : '<small style="color:var(--muted)">sin fecha</small>'}</td>
+            <td>${escHtml(r.notes||'—')}</td>
+          </tr>`;
+        }).join('');
+        reservasBlock = `
+          <div class="ota-rsv-section ${urgentCount>0?'has-urgent':''}">
+            <div class="ota-rsv-h">
+              <span class="ota-rsv-pill">RESERVAS</span>
+              <span class="ota-rsv-title">${rsvActivas.length} reserva${rsvActivas.length===1?'':'s'} activa${rsvActivas.length===1?'':'s'} · ${fmtQty(totalRsvQty)} unid. comprometidas</span>
+              ${urgentCount>0 ? `<span class="ota-rsv-urgent-tag">⚠ ${urgentCount} requiere${urgentCount===1?'':'n'} compra urgente</span>` : ''}
+            </div>
+            <table class="ota-rsv-tbl">
+              <thead><tr>
+                <th>Fecha solicitud</th>
+                <th>Material</th>
+                <th>Destino</th>
+                <th>Área</th>
+                <th class="num">Cantidad</th>
+                <th>Responsable</th>
+                <th>Vence</th>
+                <th>Observaciones</th>
+              </tr></thead>
+              <tbody>${rsvRows}</tbody>
+            </table>
+          </div>`;
+      }
+    }
 
     // Initial: first 3 groups open by default
     const isOpen = idx < 3;
@@ -3800,10 +4043,11 @@ function renderOtAnalysis(){
         <svg class="ota-group-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="ota-group-body">
-        <table class="ota-lines">
+        ${g.items.length ? `<table class="ota-lines">
           <thead>${headerCols}</thead>
           <tbody>${lines}</tbody>
-        </table>
+        </table>` : '<div style="padding:14px;color:var(--muted);font-size:13px;font-style:italic;text-align:center">Sin salidas registradas para esta OT — solo reservas pendientes.</div>'}
+        ${reservasBlock}
       </div>
     </div>`;
   }).join('');
@@ -3857,7 +4101,13 @@ function openMovDetail(movId){
   // Build header grid (datos comunes del folio) — uses .mv-cell, .mv-cell-wide, .mv-pill, .mv-pill.is-out
   const cells = [
     { label: 'Tipo de movimiento',
-      value: `<span class="mv-pill ${isSalida?'is-out':''}">${typeLabel}</span>` },
+      value: (() => {
+        if(!isSalida) return `<span class="mv-pill">${typeLabel}</span>`;
+        const isTr = mv.isTransfer || isWarehouseDest(mv.destino);
+        return isTr
+          ? `<span class="mv-pill is-out" style="background:#0F766E;color:#fff">↔ Transferencia entre bodegas</span>`
+          : `<span class="mv-pill is-out">→ Salida (consumo)</span>`;
+      })() },
     { label: isSalida ? 'Área de origen' : 'Área que recibe',
       value: escHtml(AREA_LABEL[mv.area]||mv.area||'—') },
   ];
@@ -4352,7 +4602,7 @@ function createNuevoMat(){
     clasif: clasif.charAt(0).toUpperCase()+clasif.slice(1).toLowerCase(),
     material: name,
     sap,
-    stock: { KM15:0, Reactivos:0, Nivel17:0, Ventiladores:0 },
+    stock: { KM15:0, Reactivos:0, PMFC:0, Nivel17:0, Ventiladores:0 },
     critico: document.getElementById('nm2-critic').checked ? 'Critico' : 'ok',
     specs: {
       unidad: document.getElementById('nm2-unit').value,
@@ -6561,10 +6811,10 @@ async function askResetAll(){
       }
     } catch(e){ console.warn('[Reset zero] del exception:', e.message); }
 
-    // 2) Bulk UPDATE all materials' stock to {KM15:0, Reactivos:0, Nivel17:0, Ventiladores:0}
+    // 2) Bulk UPDATE all materials' stock to {KM15:0, Reactivos:0, PMFC:0, Nivel17:0, Ventiladores:0}
     //    Single SQL UPDATE — efficient, no per-row writes.
     try {
-      const zeroStock = { KM15:0, Reactivos:0, Nivel17:0, Ventiladores:0 };
+      const zeroStock = { KM15:0, Reactivos:0, PMFC:0, Nivel17:0, Ventiladores:0 };
       const { error } = await sbClient.from('inv_materials')
         .update({ stock: zeroStock })
         .neq('client_id', -1);
@@ -6586,7 +6836,7 @@ async function askResetAll(){
   state.reservations = [];
   state.nextReservationId = 1;
   state.materials.forEach(m => {
-    m.stock = { KM15:0, Reactivos:0, Nivel17:0, Ventiladores:0 };
+    m.stock = { KM15:0, Reactivos:0, PMFC:0, Nivel17:0, Ventiladores:0 };
   });
 
   // 4) Rebuild snapshots so the next saveState/sync does NOT try to re-push deltas for the zeroing
@@ -7184,7 +7434,7 @@ function applyRemoteEvent(ev){
       clasif: ev.Clasificacion || ev.clasif || '',
       material: ev.MaterialNombre || ev.material || '',
       sap: ev.SAP || ev.sap || null,
-      stock: { KM15:0, Reactivos:0, Nivel17:0, Ventiladores:0 },
+      stock: { KM15:0, Reactivos:0, PMFC:0, Nivel17:0, Ventiladores:0 },
       critico: ev.Critico || ev.critico || 'ok',
       specs: parseExtra(ev.DataExtra) || { unidad:'UN', marca:'', modelo:'', medidas:'', descripcion:'' },
       isUserCreated: true,
@@ -7886,7 +8136,7 @@ function chatLocalRespond(q){
 
   // -------- DATA: summary --------
   if(/^resumen|resumen del|inventario.*(total|general|completo|resumen)|stock.*por.*area|stock total|cuanto.*total|estado.*invent/i.test(nlq)){
-    const t = {KM15:0, Reactivos:0, Nivel17:0, Ventiladores:0};
+    const t = {KM15:0, Reactivos:0, PMFC:0, Nivel17:0, Ventiladores:0};
     let nz=0, crits=0;
     state.materials.forEach(m=>{
       let any=false;
@@ -7994,7 +8244,7 @@ function chatLocalRespond(q){
 // =============================================================
 function chatBuildContext(){
   const ms = state.materials;
-  const t = {KM15:0,Reactivos:0,Nivel17:0,Ventiladores:0};
+  const t = {KM15:0,Reactivos:0,PMFC:0,Nivel17:0,Ventiladores:0};
   ms.forEach(m => Object.keys(t).forEach(k => t[k] += chatN(m.stock[k])));
   const crits = ms.filter(m=>m.critico==='Critico');
   const top20 = ms.slice().sort((a,b)=>chatTot(b)-chatTot(a)).slice(0,20);
@@ -8253,6 +8503,7 @@ function sbMaterialToRow(m){
     critico: m.critico || 'ok',
     stock_km15:        Number(m.stock?.KM15)         || 0,
     stock_reactivos:   Number(m.stock?.Reactivos)    || 0,
+    stock_pmfc:        Number(m.stock?.PMFC)         || 0,
     stock_nivel17:     Number(m.stock?.Nivel17)      || 0,
     stock_ventiladores:Number(m.stock?.Ventiladores) || 0,
     specs: m.specs || null,
@@ -8270,6 +8521,7 @@ function sbRowToMaterial(r){
     stock: {
       KM15:         Number(r.stock_km15)         || 0,
       Reactivos:    Number(r.stock_reactivos)    || 0,
+      PMFC:         Number(r.stock_pmfc)         || 0,
       Nivel17:      Number(r.stock_nivel17)      || 0,
       Ventiladores: Number(r.stock_ventiladores) || 0,
     },
@@ -8427,7 +8679,7 @@ async function sbInitialLoad(){
     sbSetStatus('connecting');
 
     // Materials (paged) — request only needed columns to save egress
-    const matCols = 'client_id,clasif,material,sap,critico,stock_km15,stock_reactivos,stock_nivel17,stock_ventiladores,specs';
+    const matCols = 'client_id,clasif,material,sap,critico,stock_km15,stock_reactivos,stock_pmfc,stock_nivel17,stock_ventiladores,specs';
     let allMats = [];
     let from = 0; const pageSize = 1000;
     while(true){
