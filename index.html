@@ -3239,6 +3239,7 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
     const rsv = state.reservations.find(x=>x.id===parseInt(fulfillIdRaw));
     if(rsv && rsv.status === 'active'){
       rsv.status = 'fulfilled';
+      rsv.state = 'fulfilled';
       rsv.fulfilledAt = ts;
       rsv.fulfilledBy = state.user || '—';
       rsv.fulfilledMovId = firstMovIdForReservation;
@@ -3661,6 +3662,7 @@ if(_formReserva){
         user: state.user || '—',
         resp, ot, activity, notes,
         status: 'active',
+        state: 'pendiente',
         urgentPurchase: overStock,
         fulfilledAt: null,
         fulfilledBy: null,
@@ -4427,6 +4429,7 @@ async function cancelReservation(id){
     'Sí, cancelar', true);
   if(!ok) return;
   r.status = 'cancelled';
+  r.state = 'cancelled';
   r.cancelledAt = new Date().toISOString();
   r.cancelledBy = state.user || '—';
   saveState();
@@ -8773,7 +8776,7 @@ function sbMovementToRow(mv){
     ts: mv.timestamp || null,
     user_name: mv.user || null,
     resp: mv.resp || null,
-    doc: mv.doc || null,
+    doc: mv.folio || mv.doc || null,
     destino: mv.destino || null,
     ot: mv.ot || null,
     activity: mv.activity || null,
@@ -8799,22 +8802,29 @@ function sbRowToMovement(r){
     resp: r.resp || '',
     notes: r.notes || '',
   };
-  if(r.doc) mv.doc = r.doc;
+  if(r.doc){ mv.folio = r.doc; mv.doc = r.doc; }
   if(r.destino) mv.destino = r.destino;
   if(r.ot) mv.ot = r.ot;
   if(r.activity) mv.activity = r.activity;
   if(r.is_imported) mv._imported = true;
   if(r.is_adjustment) mv._adjustment = true;
+  // Backfill isTransfer flag from destino (since DB doesn't store it explicitly)
+  if(mv.destino && typeof isWarehouseDest === 'function' && isWarehouseDest(mv.destino)){
+    mv.isTransfer = true;
+    mv.destType = 'warehouse';
+  } else if(mv.destino){
+    mv.destType = 'consumption';
+  }
   return mv;
 }
 
 function sbReservationToRow(r){
-  // Map local status (active/fulfilled/cancelled) → DB state (pendiente/fulfilled/cancelled)
-  const dbState = r.state
-    || (r.status === 'active'    ? 'pendiente'
-      : r.status === 'fulfilled' ? 'fulfilled'
-      : r.status === 'cancelled' ? 'cancelled'
-      : 'pendiente');
+  // Map local status (active/fulfilled/cancelled) → DB state (pendiente/fulfilled/cancelled).
+  // status takes priority over state because status is the field local code modifies.
+  const dbState = r.status === 'active'    ? 'pendiente'
+                : r.status === 'fulfilled' ? 'fulfilled'
+                : r.status === 'cancelled' ? 'cancelled'
+                : (r.state || 'pendiente');
   return {
     client_id: r.id,
     mat_id: r.matId || null,
@@ -9222,7 +9232,7 @@ function sbMovSig(mv){
   return JSON.stringify({
     t: mv.type, mi: mv.matId||null, q: Number(mv.qty)||0, a: mv.area||null,
     d: mv.date||null, ts: mv.timestamp||null, u: mv.user||null, r: mv.resp||null,
-    do: mv.doc||null, de: mv.destino||null, ot: mv.ot||null, ac: mv.activity||null,
+    do: mv.folio||mv.doc||null, de: mv.destino||null, ot: mv.ot||null, ac: mv.activity||null,
     n: mv.notes||null,
   });
 }
