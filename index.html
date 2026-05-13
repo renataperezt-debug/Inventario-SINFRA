@@ -6057,41 +6057,45 @@ async function loadSapReservasFromFile(ev){
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {type:'array'});
-    const ws = wb.Sheets['Hoja1'] || wb.Sheets[wb.SheetNames[0]];
-    if(!ws){ toast('No se encontró Hoja1','err'); return; }
-    // header en fila 2 (índice 1), datos desde fila 3
+    // Usar Hoja3 — filtrada solo a usuarios SINFRA
+    const ws = wb.Sheets['Hoja3'];
+    if(!ws){ toast('No se encontró Hoja3 (datos filtrados a SINFRA)','err'); return; }
+    // Hoja3: header en fila 5, datos desde fila 6
+    // Columnas: Creado por | Nº Reserva | Nº Material (SAP) | Descripción | Solicitada | Despachada | Pendiente
     const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
-    // forward-fill columna A (Numero de Reserva)
     let currentRsv = null;
     const parsed = [];
-    for(let i = 2; i < rows.length; i++){
+    for(let i = 5; i < rows.length; i++){
       const r = rows[i];
-      if(!r || r.length < 22) continue;
-      if(r[0]) currentRsv = String(r[0]).trim();
-      const sap = r[6] ? String(r[6]).trim() : null;
+      if(!r || r.length < 7) continue;
+      const creadoPor = r[0] ? String(r[0]).trim() : null;
+      // Forward-fill num_reserva: si es 0 o vacío, usa el último válido
+      if(r[1] && r[1] !== 0 && String(r[1]).trim() !== '0'){
+        currentRsv = String(r[1]).trim();
+      }
+      const sap = r[2] ? String(r[2]).trim() : null;
       if(!sap) continue;
-      const borrado = r[16] && String(r[16]).toLowerCase().includes('elimina');
-      if(borrado) continue;  // descartar posiciones eliminadas
+      // skip totales o filas vacías
+      if(!creadoPor && !currentRsv) continue;
       parsed.push({
         sap,
         num_reserva: currentRsv,
-        num_posicion: r[1] != null ? String(r[1]) : null,
-        cant_solic: Number(r[19]) || 0,
-        cant_desp:  Number(r[20]) || 0,
-        cant_pend:  Number(r[21]) || 0,
-        fecha_necesidad: r[14] ? String(r[14]) : null,
+        num_posicion: null,
+        cant_solic: Number(r[4]) || 0,
+        cant_desp:  Number(r[5]) || 0,
+        cant_pend:  Number(r[6]) || 0,
+        fecha_necesidad: null,
         borrado: false,
-        ot: r[2] && r[2] !== '#' ? String(r[2]) : null,
-        almacen: r[4] ? String(r[4]) : null,
-        creado_por: r[17] ? String(r[17]) : null,
+        ot: null,
+        almacen: null,
+        creado_por: creadoPor,
       });
     }
-    if(!parsed.length){ toast('No se encontraron reservas vigentes','warn'); return; }
+    if(!parsed.length){ toast('No se encontraron reservas SINFRA en Hoja3','warn'); return; }
 
     toast(`Subiendo ${parsed.length} reservas SAP a Supabase...`,'warn',3000);
 
     if(typeof sbClient === 'undefined' || !sbClient){
-      // Solo local
       sapReservasBySap = {};
       parsed.forEach(p => { (sapReservasBySap[p.sap] = sapReservasBySap[p.sap] || []).push(p); });
       try { localStorage.setItem('inv_sap_reservas', JSON.stringify(parsed)); } catch(e){}
@@ -6100,11 +6104,9 @@ async function loadSapReservasFromFile(ev){
       return;
     }
 
-    // Borrar antiguas y subir nuevas
     try {
       await sbClient.from('inv_sap_reservas').delete().neq('id', -1);
     } catch(e){ console.warn('delete old', e); }
-    // batch insert
     const CHUNK = 500;
     let inserted = 0;
     for(let i = 0; i < parsed.length; i += CHUNK){
@@ -6113,7 +6115,6 @@ async function loadSapReservasFromFile(ev){
       if(error){ console.error('insert', error); toast(`Error insert: ${error.message}`,'err',6000); break; }
       inserted += slice.length;
     }
-    // re-leer
     await loadSapReservasFromSupabase();
     renderInventario();
     toast(`✓ ${inserted} reservas SAP cargadas y sincronizadas`,'ok',5000);
@@ -6121,7 +6122,7 @@ async function loadSapReservasFromFile(ev){
     console.error('parse excel', e);
     toast(`Error procesando Excel: ${e.message}`,'err',6000);
   } finally {
-    ev.target.value = '';  // reset input
+    ev.target.value = '';
   }
 }
 window.loadSapReservasFromFile = loadSapReservasFromFile;
@@ -6188,12 +6189,11 @@ function openSapDetail(matId){
   const s = getSapEstadoForMat(m);
   if(!s){ toast('Sin reservas SAP para este material','warn'); return; }
   const rows = s.reservas.map(r => `<tr>
-    <td><b>${escHtml(r.num_reserva||'—')}</b>${r.num_posicion?`<br><small style="color:var(--muted);font-size:10px">Pos. ${escHtml(r.num_posicion)}</small>`:''}</td>
+    <td><b>${escHtml(r.num_reserva||'—')}</b></td>
     <td class="num">${fmtQty(r.cant_solic)}</td>
     <td class="num">${fmtQty(r.cant_desp)}</td>
     <td class="num"><b style="color:${r.cant_pend>0?'#DC2626':'#16A34A'}">${fmtQty(r.cant_pend)}</b></td>
-    <td><small>${escHtml(r.ot||'—')}</small></td>
-    <td><small>${escHtml(r.fecha_necesidad||'—')}</small></td>
+    <td><small style="color:var(--muted)">${escHtml(r.creado_por||'—')}</small></td>
   </tr>`).join('');
   const estadoLbl = s.estado==='listo' ? '<span style="color:#16A34A">✓ LISTO</span>'
                   : s.estado==='parcial' ? '<span style="color:#EA580C">◐ PARCIAL</span>'
@@ -6220,8 +6220,7 @@ function openSapDetail(matId){
             <th class="num">Solicitada</th>
             <th class="num">Despachada</th>
             <th class="num">Pendiente</th>
-            <th>OT</th>
-            <th>Fecha</th>
+            <th>Creado por</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
