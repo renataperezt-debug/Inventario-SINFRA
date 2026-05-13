@@ -1826,10 +1826,13 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         <option value="">Todas las ubicaciones</option>
         <option value="KM15">KM 15</option>
         <option value="Reactivos">Reactivos</option>
+        <option value="PMFC">PMFC</option>
         <option value="Nivel17">Nivel 17</option>
         <option value="Ventiladores">Ventiladores</option>
       </select>
       <span class="count" id="inv-count">0 / 0</span>
+      <button class="btn btn-sm" id="btn-load-sap" onclick="document.getElementById('file-sap-reservas').click()" title="Carga el Excel 'Copia de reservas Sinfra' descargado de SharePoint para vincular estado de compras por material.">📋 Cargar reservas SAP</button>
+      <input type="file" id="file-sap-reservas" accept=".xlsx,.xls" style="display:none" onchange="loadSapReservasFromFile(event)">
     </div>
     <div class="table-wrap">
       <table class="t" id="inv-tbl">
@@ -1839,6 +1842,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
           <th class="num">Total</th>
           <th class="num" title="Cantidad reservada (apartada para OT futuras)">Reservado</th>
           <th class="num" title="Stock total menos reservado">Disponible</th>
+          <th title="Estado de la reserva SAP (compra). Doble click para detalle.">Estado SAP</th>
           <th>Estado</th><th></th>
         </tr></thead>
         <tbody></tbody>
@@ -6029,15 +6033,207 @@ function renderInventario(){
         ? `<span class="rsv-clickable" onclick="openReservationsModal(${m.id})" title="Ver reservas de este material"><b>${reservedTot}</b></span>`
         : '—'}</td>
       <td class="num"><b style="color:${availTot<=0?'var(--red)':(availTot<reservedTot?'#B45309':'var(--ink)')}">${availTot}</b></td>
+      <td>${renderSapEstadoCell(m)}</td>
       <td>${stateTag}</td>
       <td><button class="tbl-edit" onclick="openEditMat(${m.id})" title="Editar especificaciones">✎ Editar</button></td>
     </tr>`;
   }).join('');
   if(mats.length > cap){
-    tb.innerHTML += `<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:14px">Mostrando primeros ${cap} de ${mats.length}. Refina los filtros para ver más.</td></tr>`;
+    tb.innerHTML += `<tr><td colspan="13" style="text-align:center;color:var(--muted);padding:14px">Mostrando primeros ${cap} de ${mats.length}. Refina los filtros para ver más.</td></tr>`;
   }
 }
 ['inv-search','inv-clasif','inv-state','inv-area','inv-rsv'].forEach(id=>{const el=document.getElementById(id); if(el) el.addEventListener('input', renderInventario);});
+
+// ============================================================
+// SAP RESERVAS (compras) — carga desde Excel SharePoint
+// ============================================================
+let sapReservasBySap = {};  // sap → [filas]
+
+async function loadSapReservasFromFile(ev){
+  const file = ev.target.files && ev.target.files[0];
+  if(!file) return;
+  if(typeof XLSX === 'undefined'){ toast('Librería Excel no cargada, refresca','err'); return; }
+  toast('Procesando Excel...','warn',2000);
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const ws = wb.Sheets['Hoja1'] || wb.Sheets[wb.SheetNames[0]];
+    if(!ws){ toast('No se encontró Hoja1','err'); return; }
+    // header en fila 2 (índice 1), datos desde fila 3
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+    // forward-fill columna A (Numero de Reserva)
+    let currentRsv = null;
+    const parsed = [];
+    for(let i = 2; i < rows.length; i++){
+      const r = rows[i];
+      if(!r || r.length < 22) continue;
+      if(r[0]) currentRsv = String(r[0]).trim();
+      const sap = r[6] ? String(r[6]).trim() : null;
+      if(!sap) continue;
+      const borrado = r[16] && String(r[16]).toLowerCase().includes('elimina');
+      if(borrado) continue;  // descartar posiciones eliminadas
+      parsed.push({
+        sap,
+        num_reserva: currentRsv,
+        num_posicion: r[1] != null ? String(r[1]) : null,
+        cant_solic: Number(r[19]) || 0,
+        cant_desp:  Number(r[20]) || 0,
+        cant_pend:  Number(r[21]) || 0,
+        fecha_necesidad: r[14] ? String(r[14]) : null,
+        borrado: false,
+        ot: r[2] && r[2] !== '#' ? String(r[2]) : null,
+        almacen: r[4] ? String(r[4]) : null,
+        creado_por: r[17] ? String(r[17]) : null,
+      });
+    }
+    if(!parsed.length){ toast('No se encontraron reservas vigentes','warn'); return; }
+
+    toast(`Subiendo ${parsed.length} reservas SAP a Supabase...`,'warn',3000);
+
+    if(typeof sbClient === 'undefined' || !sbClient){
+      // Solo local
+      sapReservasBySap = {};
+      parsed.forEach(p => { (sapReservasBySap[p.sap] = sapReservasBySap[p.sap] || []).push(p); });
+      try { localStorage.setItem('inv_sap_reservas', JSON.stringify(parsed)); } catch(e){}
+      renderInventario();
+      toast(`✓ ${parsed.length} reservas cargadas (modo local)`,'ok',4000);
+      return;
+    }
+
+    // Borrar antiguas y subir nuevas
+    try {
+      await sbClient.from('inv_sap_reservas').delete().neq('id', -1);
+    } catch(e){ console.warn('delete old', e); }
+    // batch insert
+    const CHUNK = 500;
+    let inserted = 0;
+    for(let i = 0; i < parsed.length; i += CHUNK){
+      const slice = parsed.slice(i, i+CHUNK);
+      const { error } = await sbClient.from('inv_sap_reservas').insert(slice);
+      if(error){ console.error('insert', error); toast(`Error insert: ${error.message}`,'err',6000); break; }
+      inserted += slice.length;
+    }
+    // re-leer
+    await loadSapReservasFromSupabase();
+    renderInventario();
+    toast(`✓ ${inserted} reservas SAP cargadas y sincronizadas`,'ok',5000);
+  } catch(e){
+    console.error('parse excel', e);
+    toast(`Error procesando Excel: ${e.message}`,'err',6000);
+  } finally {
+    ev.target.value = '';  // reset input
+  }
+}
+window.loadSapReservasFromFile = loadSapReservasFromFile;
+
+async function loadSapReservasFromSupabase(){
+  if(typeof sbClient === 'undefined' || !sbClient){
+    // intenta localStorage
+    try {
+      const raw = localStorage.getItem('inv_sap_reservas');
+      if(raw){
+        const arr = JSON.parse(raw);
+        sapReservasBySap = {};
+        arr.forEach(p => { (sapReservasBySap[p.sap] = sapReservasBySap[p.sap] || []).push(p); });
+      }
+    } catch(e){}
+    return;
+  }
+  try {
+    let all = [];
+    let from = 0; const ps = 1000;
+    while(true){
+      const { data, error } = await sbClient.from('inv_sap_reservas').select('*').range(from, from+ps-1);
+      if(error){ console.error(error); break; }
+      if(!data || !data.length) break;
+      all = all.concat(data);
+      if(data.length < ps) break;
+      from += ps;
+    }
+    sapReservasBySap = {};
+    all.forEach(p => { (sapReservasBySap[p.sap] = sapReservasBySap[p.sap] || []).push(p); });
+  } catch(e){ console.error('load sap', e); }
+}
+window.loadSapReservasFromSupabase = loadSapReservasFromSupabase;
+
+function getSapEstadoForMat(m){
+  const sap = m.sap == null ? null : String(m.sap).trim();
+  if(!sap || sap === '—' || sap.toLowerCase() === 'catalogo' || sap.toLowerCase() === 'catalgo' || sap.toLowerCase() === 'catologo') return null;
+  const list = sapReservasBySap[sap];
+  if(!list || !list.length) return null;
+  let solic = 0, desp = 0, pend = 0;
+  list.forEach(r => { solic += r.cant_solic||0; desp += r.cant_desp||0; pend += r.cant_pend||0; });
+  let estado;
+  if(pend <= 0 && solic > 0) estado = 'listo';
+  else if(desp > 0 && pend > 0) estado = 'parcial';
+  else estado = 'pendiente';
+  return { estado, solic, desp, pend, reservas: list };
+}
+
+function renderSapEstadoCell(m){
+  const s = getSapEstadoForMat(m);
+  if(!s) return '<span style="color:var(--muted);font-size:11px">—</span>';
+  const tagMap = {
+    pendiente: '<span class="al-tag-rojo">Pendiente</span>',
+    parcial:   '<span class="al-tag-naranjo">Parcial</span>',
+    listo:     '<span class="al-tag-amarillo" style="background:#16A34A">Listo</span>',
+  };
+  return `<span class="sap-estado-cell" ondblclick="openSapDetail(${m.id})" style="cursor:pointer" title="Doble click para ver N° de reserva y cantidades">${tagMap[s.estado]}</span>`;
+}
+window.renderSapEstadoCell = renderSapEstadoCell;
+
+function openSapDetail(matId){
+  const m = state.materials.find(x=>x.id===matId);
+  if(!m) return;
+  const s = getSapEstadoForMat(m);
+  if(!s){ toast('Sin reservas SAP para este material','warn'); return; }
+  const rows = s.reservas.map(r => `<tr>
+    <td><b>${escHtml(r.num_reserva||'—')}</b>${r.num_posicion?`<br><small style="color:var(--muted);font-size:10px">Pos. ${escHtml(r.num_posicion)}</small>`:''}</td>
+    <td class="num">${fmtQty(r.cant_solic)}</td>
+    <td class="num">${fmtQty(r.cant_desp)}</td>
+    <td class="num"><b style="color:${r.cant_pend>0?'#DC2626':'#16A34A'}">${fmtQty(r.cant_pend)}</b></td>
+    <td><small>${escHtml(r.ot||'—')}</small></td>
+    <td><small>${escHtml(r.fecha_necesidad||'—')}</small></td>
+  </tr>`).join('');
+  const estadoLbl = s.estado==='listo' ? '<span style="color:#16A34A">✓ LISTO</span>'
+                  : s.estado==='parcial' ? '<span style="color:#EA580C">◐ PARCIAL</span>'
+                  : '<span style="color:#DC2626">○ PENDIENTE</span>';
+  const html = `
+    <div class="modal-bg" onclick="this.remove()" style="display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999">
+      <div onclick="event.stopPropagation()" style="background:#fff;max-width:760px;width:92%;max-height:88vh;overflow:auto;border-radius:12px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,0.3)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+          <div>
+            <h3 style="margin:0 0 4px;font-size:16px">${escHtml(m.material)}</h3>
+            <small style="color:var(--muted)">SAP ${escHtml(m.sap||'—')} · ${escHtml(m.clasif||'')}</small>
+          </div>
+          <button onclick="this.closest('.modal-bg').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
+        </div>
+        <div style="background:var(--bg);padding:12px;border-radius:8px;margin-bottom:14px;display:flex;gap:18px;flex-wrap:wrap;font-size:13px">
+          <div>Estado: <b>${estadoLbl}</b></div>
+          <div>Total solicitado: <b>${fmtQty(s.solic)}</b></div>
+          <div>Total despachado: <b>${fmtQty(s.desp)}</b></div>
+          <div>Pendiente: <b style="color:${s.pend>0?'#DC2626':'#16A34A'}">${fmtQty(s.pend)}</b></div>
+        </div>
+        <table class="t" style="font-size:12.5px">
+          <thead><tr>
+            <th>N° Reserva SAP</th>
+            <th class="num">Solicitada</th>
+            <th class="num">Despachada</th>
+            <th class="num">Pendiente</th>
+            <th>OT</th>
+            <th>Fecha</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+window.openSapDetail = openSapDetail;
+
+// Cargar al iniciar
+setTimeout(()=>{ try{ loadSapReservasFromSupabase().then(()=>renderInventario()); }catch(e){} }, 2500);
+
 
 // ---------- HISTORIAL ----------
 function renderHistorial(){
