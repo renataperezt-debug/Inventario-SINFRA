@@ -358,19 +358,56 @@ tr.deleted-row .tag,tr.deleted-row b{text-decoration:line-through}
 
 /* DESTINATION PICKER (smaller pills than area picker) */
 .dest-pick{display:flex;flex-direction:column;gap:14px}
-.dest-group{border:1px solid var(--line);border-radius:10px;padding:12px}
-.dest-group.dest-group-wh{background:#F0FDFA;border-color:#5EEAD4}
-.dest-group.dest-group-cs{background:#FFF7ED;border-color:#FDBA74}
-.dest-group-h{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px}
-.dest-group-h small{color:var(--muted);font-size:12px;line-height:1.3}
+.dest-group{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:14px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));
+  gap:8px;
+}
+.dest-group-h{
+  grid-column:1 / -1;
+  display:flex; align-items:center; flex-wrap:wrap; gap:10px;
+  margin-bottom:4px;
+}
+.dest-group-h small{color:var(--muted);font-size:12px;line-height:1.3;flex:1;min-width:0}
 .dest-pill{display:inline-block;padding:4px 11px;border-radius:12px;font-size:12px;font-weight:600;letter-spacing:.3px}
 .dest-pill.wh{background:#0F766E;color:#fff}
 .dest-pill.cs{background:#9A3412;color:#fff}
-.dest-group label{flex:0 0 auto}
-.dest-group .dest-wh,.dest-group .dest-cs{display:inline-block;margin:4px 6px 4px 0}
-.dest-group .opt small{display:block;margin-top:2px;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
+.dest-group.dest-group-wh{background:#F0FDFA;border-color:#5EEAD4}
+.dest-group.dest-group-cs{background:#FFF7ED;border-color:#FDBA74}
+.dest-group.cs-chancado{background:var(--yellow-l);border-color:#F4AA00}
+.dest-group.cs-chancado .dest-pill.cs{background:#8B6914;color:#fff}
+.dest-group.cs-chancado .dest-cs .opt small{color:#8B6914}
+.dest-group.cs-concentradora{background:var(--green-l);border-color:#86C39A}
+.dest-group.cs-concentradora .dest-pill.cs{background:var(--green);color:#fff}
+.dest-group.cs-concentradora .dest-cs .opt small{color:var(--green)}
+.dest-group.cs-pmfc{background:#E8EEF2;border-color:#90A4AE}
+.dest-group.cs-pmfc .dest-pill.cs{background:#37474F;color:#fff}
+.dest-group.cs-pmfc .dest-cs .opt small{color:#37474F}
+.dest-group label{margin:0;cursor:pointer}
+.dest-group label input{display:none}
+.dest-group .opt{
+  background:#fff;
+  border:1.5px solid transparent;
+  border-radius:8px;
+  padding:10px 12px;
+  text-align:left;
+  transition:all .12s;
+  height:100%;
+  display:flex; flex-direction:column; justify-content:center;
+}
+.dest-group .opt:hover{border-color:#94A3B8}
+.dest-group .opt strong{display:block;font-size:13px;color:var(--ink);line-height:1.25}
+.dest-group .opt small{display:block;margin-top:3px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;font-weight:600}
 .dest-wh .opt small{color:#0F766E}
 .dest-cs .opt small{color:#9A3412}
+.dest-group input:checked + .opt{
+  border-color:var(--orange);
+  background:var(--orange-l);
+  box-shadow:0 0 0 2px rgba(229,83,2,.15);
+}
 /* radio + label visual selection (reuses existing input:checked + .opt styling, just keep consistency) */
 
 /* ---------- TRANSFER VS CONSUMPTION BADGES ---------- */
@@ -2551,9 +2588,15 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         </div>
       </div>
     </div>
-    <div class="actions right" style="margin-top:18px">
-      <button class="btn btn-ghost" id="em-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="em-save">Guardar cambios</button>
+    <div class="actions" style="margin-top:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-delete" id="em-delete" type="button" title="Eliminar este material del catálogo">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+        Eliminar material
+      </button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" id="em-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="em-save">Guardar cambios</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2594,25 +2637,33 @@ const AREA_LABEL = Object.fromEntries(AREAS.map(a=>[a.key,a.label]));
 // Notar: KM 15 y Reactivos son áreas Y destinos (transferencia entre áreas).
 // El resto son solo destinos (lugares de uso).
 const DESTINOS = [
-  // Lugares de almacenamiento (warehouse) — el material se queda ahí y suma al stock de esa taller
+  // Lugares de almacenamiento (warehouse) — el material se queda ahí y suma al stock
   {key:'KM15',           label:'KM 15',           type:'warehouse'},
   {key:'Reactivos',      label:'Reactivos',       type:'warehouse'},
   {key:'PMFC',           label:'PMFC',            type:'warehouse'},
   {key:'Nivel17',        label:'Nivel 17',        type:'warehouse'},
   {key:'Ventiladores',   label:'Ventiladores',    type:'warehouse'},
-  // Lugares de consumo — el material se gasta ahí, no acumula stock
-  {key:'Ch3',            label:'Ch 3°',           type:'consumption'},
-  {key:'Ch4',            label:'Ch 4°',           type:'consumption'},
-  {key:'Nodo3500',       label:'Nodo 3500',       type:'consumption'},
-  {key:'Nodo3700',       label:'Nodo 3700',       type:'consumption'},
-  {key:'SAG',            label:'SAG',             type:'consumption'},
-  {key:'MUN1',           label:'MUN 1',           type:'consumption'},
-  {key:'MUN2',           label:'MUN 2',           type:'consumption'},
-  {key:'Convencional',   label:'Convencional',    type:'consumption'},
-  {key:'Flotacion',      label:'Flotación',       type:'consumption'},
-  {key:'CAL',            label:'CAL',             type:'consumption'},
-  {key:'Larox',          label:'Larox',           type:'consumption'},
-  {key:'PlantaCloro',    label:'Planta de Cloro', type:'consumption'},
+  // Lugares de consumo — agrupados por área
+  // ── CHANCADO ──
+  {key:'Ch3',            label:'Ch 3°',           type:'consumption', grupo:'Chancado'},
+  {key:'Ch4',            label:'Ch 4°',           type:'consumption', grupo:'Chancado'},
+  {key:'Nodo3500',       label:'Nodo 3500',       type:'consumption', grupo:'Chancado'},
+  {key:'Nodo3700',       label:'Nodo 3700',       type:'consumption', grupo:'Chancado'},
+  // ── CONCENTRADORA ──
+  {key:'SAG',            label:'SAG',             type:'consumption', grupo:'Concentradora'},
+  {key:'MUN2',           label:'MUN 2',           type:'consumption', grupo:'Concentradora'},
+  {key:'Convencional',   label:'Convencional',    type:'consumption', grupo:'Concentradora'},
+  {key:'MUN1',           label:'MUN 1',           type:'consumption', grupo:'Concentradora'},
+  {key:'Flotacion',      label:'Flotación',       type:'consumption', grupo:'Concentradora'},
+  {key:'CAL',            label:'CAL',             type:'consumption', grupo:'Concentradora'},
+  // ── PMFC ──
+  {key:'PlantaCloro',    label:'Planta de Cloro', type:'consumption', grupo:'PMFC'},
+  {key:'Larox',          label:'Larox',           type:'consumption', grupo:'PMFC'},
+  {key:'LR',             label:'LR',              type:'consumption', grupo:'PMFC'},
+  {key:'Moly',           label:'Moly',            type:'consumption', grupo:'PMFC'},
+  {key:'ConvencionalPMFC', label:'Convencional (PMFC)', type:'consumption', grupo:'PMFC'},
+  {key:'Cementadora',    label:'Cementadora',     type:'consumption', grupo:'PMFC'},
+  {key:'PTE',            label:'PTE',             type:'consumption', grupo:'PMFC'},
 ];
 
 // Helper: ¿el destino marcado es una taller (transferencia) o un lugar de consumo?
@@ -3025,26 +3076,36 @@ function renderAreaPickers(){
   const destCt = document.getElementById('sal-destinos');
   if(destCt){
     const wh = DESTINOS.filter(d=>d.type==='warehouse');
-    const cs = DESTINOS.filter(d=>d.type==='consumption');
+    const grupos = ['Chancado','Concentradora','PMFC'];
+    const grupoMeta = {
+      Chancado:      {cls:'cs-chancado',      hint:'Rampas y nodos de chancado primario.'},
+      Concentradora: {cls:'cs-concentradora', hint:'SAG, MUN, Convencional, Flotación y CAL.'},
+      PMFC:          {cls:'cs-pmfc',          hint:'Procesos de molibdeno, cloro y filtros.'},
+    };
     destCt.innerHTML = `
       <div class="dest-group dest-group-wh">
-        <div class="dest-group-h"><span class="dest-pill wh">📦 Talleres (transferencia)</span>
-          <small>El stock se mueve automáticamente desde el origen hacia la taller destino — no necesitas registrar entrada.</small>
+        <div class="dest-group-h"><span class="dest-pill wh">Talleres (transferencia)</span>
+          <small>El stock se mueve automáticamente desde el origen hacia el taller destino — no necesitas registrar entrada.</small>
         </div>
         ${wh.map(d=>`<label class="dest-wh">
           <input type="radio" name="sal-destino" value="${d.key}">
           <div class="opt"><strong>${escHtml(d.label)}</strong><small>Taller</small></div>
         </label>`).join('')}
       </div>
-      <div class="dest-group dest-group-cs">
-        <div class="dest-group-h"><span class="dest-pill cs">🔧 Lugares de consumo</span>
-          <small>El material se gasta ahí — solo se descuenta del origen.</small>
-        </div>
-        ${cs.map(d=>`<label class="dest-cs">
-          <input type="radio" name="sal-destino" value="${d.key}">
-          <div class="opt"><strong>${escHtml(d.label)}</strong><small>Consumo</small></div>
-        </label>`).join('')}
-      </div>`;
+      ${grupos.map(g => {
+        const items = DESTINOS.filter(d=>d.type==='consumption' && d.grupo===g);
+        if(!items.length) return '';
+        const meta = grupoMeta[g];
+        return `<div class="dest-group dest-group-cs ${meta.cls}">
+          <div class="dest-group-h"><span class="dest-pill cs">${escHtml(g)}</span>
+            <small>${escHtml(meta.hint)}</small>
+          </div>
+          ${items.map(d=>`<label class="dest-cs">
+            <input type="radio" name="sal-destino" value="${d.key}">
+            <div class="opt"><strong>${escHtml(d.label)}</strong><small>${escHtml(g)}</small></div>
+          </label>`).join('')}
+        </div>`;
+      }).join('')}`;
   }
   // Re-render selected display when area changes
   document.querySelectorAll('#sal-areas input, #ent-areas input').forEach(r=>{
@@ -3536,22 +3597,32 @@ function renderReservaAreaPicker(){
   const dest = document.getElementById('rsv-destinos');
   if(dest){
     const wh = DESTINOS.filter(d=>d.type==='warehouse');
-    const cs = DESTINOS.filter(d=>d.type==='consumption');
+    const grupos = ['Chancado','Concentradora','PMFC'];
+    const grupoMeta = {
+      Chancado:      {cls:'cs-chancado'},
+      Concentradora: {cls:'cs-concentradora'},
+      PMFC:          {cls:'cs-pmfc'},
+    };
     dest.innerHTML = `
       <div class="dest-group dest-group-wh">
-        <div class="dest-group-h"><span class="dest-pill wh">📦 Talleres (transferencia)</span></div>
+        <div class="dest-group-h"><span class="dest-pill wh">Talleres (transferencia)</span></div>
         ${wh.map(d=>`<label class="dest-wh">
           <input type="radio" name="rsv-destino" value="${d.key}">
           <div class="opt"><strong>${escHtml(d.label)}</strong><small>Taller</small></div>
         </label>`).join('')}
       </div>
-      <div class="dest-group dest-group-cs">
-        <div class="dest-group-h"><span class="dest-pill cs">🔧 Lugares de consumo</span></div>
-        ${cs.map(d=>`<label class="dest-cs">
-          <input type="radio" name="rsv-destino" value="${d.key}">
-          <div class="opt"><strong>${escHtml(d.label)}</strong><small>Consumo</small></div>
-        </label>`).join('')}
-      </div>`;
+      ${grupos.map(g => {
+        const items = DESTINOS.filter(d=>d.type==='consumption' && d.grupo===g);
+        if(!items.length) return '';
+        const meta = grupoMeta[g];
+        return `<div class="dest-group dest-group-cs ${meta.cls}">
+          <div class="dest-group-h"><span class="dest-pill cs">${escHtml(g)}</span></div>
+          ${items.map(d=>`<label class="dest-cs">
+            <input type="radio" name="rsv-destino" value="${d.key}">
+            <div class="opt"><strong>${escHtml(d.label)}</strong><small>${escHtml(g)}</small></div>
+          </label>`).join('')}
+        </div>`;
+      }).join('')}`;
   }
 }
 
@@ -5099,6 +5170,63 @@ document.getElementById('em-save').addEventListener('click', ()=>{
   closeEditMat();
   renderInventario();
   renderHistorial();
+  renderDashboard();
+});
+
+// ---------- DELETE MATERIAL (from edit modal) ----------
+document.getElementById('em-delete').addEventListener('click', async ()=>{
+  if(!editingMatId) return;
+  const m = state.materials.find(x=>x.id===editingMatId);
+  if(!m){ closeEditMat(); return; }
+
+  // Safety checks
+  const totalStock = AREA_KEYS.reduce((s,k)=>s + (Number(m.stock?.[k])||0), 0);
+  const movs = state.movements.filter(mv => mv.matId === m.id && !mv._adjustment);
+  const rsvs = (state.reservations||[]).filter(r => r.matId === m.id && r.status === 'active');
+
+  const blockers = [];
+  if(totalStock > 0) blockers.push(`Tiene <b>${fmtQty(totalStock)} unidades en stock</b>. Ajusta a 0 antes de eliminar.`);
+  if(rsvs.length)    blockers.push(`Tiene <b>${rsvs.length} reserva${rsvs.length===1?'':'s'} activa${rsvs.length===1?'':'s'}</b>. Cancélalas primero.`);
+
+  if(blockers.length){
+    await confirmDialog(
+      'No se puede eliminar este material',
+      `Antes de eliminar "${m.material}" debes resolver:<br><br>• ${blockers.join('<br>• ')}`,
+      'Entendido',
+      false
+    );
+    return;
+  }
+
+  const warnHistory = movs.length
+    ? `<br><br>⚠ Este material tiene <b>${movs.length} movimiento${movs.length===1?'':'s'}</b> en el historial. Esos registros se conservarán pero quedarán huérfanos (sin link al catálogo).`
+    : '';
+  const ok = await confirmDialog(
+    'Eliminar material del catálogo',
+    `Vas a eliminar definitivamente:<br><br><b>${escHtml(m.material)}</b><br><small style="color:var(--muted)">SAP ${escHtml(m.sap||'—')} · ${escHtml(m.clasif||'')}</small>${warnHistory}<br><br>Esta acción es permanente y se sincroniza a Supabase.`,
+    'Sí, eliminar material',
+    true
+  );
+  if(!ok) return;
+
+  // Remove from local state
+  const idx = state.materials.findIndex(x=>x.id===editingMatId);
+  if(idx >= 0) state.materials.splice(idx, 1);
+
+  // Delete from Supabase
+  if(typeof sbClient !== 'undefined' && sbClient){
+    try {
+      if(typeof sbMarkPushed === 'function') sbMarkPushed('materials', m.id);
+      await sbClient.from('inv_materials').delete().eq('client_id', m.id);
+    } catch(e){ console.error('sb delete mat', e); }
+  }
+  if(typeof sbMatSnapshot !== 'undefined') sbMatSnapshot.delete(m.id);
+
+  saveState();
+  toast(`Material "${m.material}" eliminado`, 'ok', 4000);
+
+  closeEditMat();
+  renderInventario();
   renderDashboard();
 });
 
