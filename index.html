@@ -1525,7 +1525,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
 <!-- ============== ENTRADA ============== -->
 <section class="view" id="view-entrada">
   <h2 class="view-title">Registrar entrada de material</h2>
-  <p class="view-sub">Recepción desde taller central, proveedor o transferencia. El stock se sumará al área seleccionada.</p>
+  <p class="view-sub">Recepción desde taller central, proveedor, transferencia o devolución desde actividad. El stock se sumará al área seleccionada.</p>
 
   <div class="card">
 
@@ -1533,9 +1533,55 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       <div class="form-grid">
 
         <div class="field field-full">
+          <label>Tipo de entrada <span class="req">*</span></label>
+          <div class="area-pick ent-type-pick">
+            <label class="ent-type-normal">
+              <input type="radio" name="ent-subtype" value="normal" checked>
+              <div class="opt">
+                <div class="ent-type-icon">📥</div>
+                <strong>Entrada nueva</strong>
+                <small>Proveedor, taller central o transferencia</small>
+              </div>
+            </label>
+            <label class="ent-type-devol">
+              <input type="radio" name="ent-subtype" value="devolucion">
+              <div class="opt">
+                <div class="ent-type-icon">↩</div>
+                <strong>Devolución</strong>
+                <small>Material que vuelve desde una OT</small>
+              </div>
+            </label>
+          </div>
+          <span class="field-hint">💡 Usa <b>Devolución</b> cuando el material vuelve al inventario porque sobró, no se utilizó, fue suspendido o se dañó. En el historial puedes filtrarlas con la opción "↩ Solo devoluciones".</span>
+        </div>
+
+        <div class="field field-full">
           <label>N° Folio <span class="req">*</span></label>
           <input type="text" id="ent-folio" placeholder="Ej. F-2026-00123" autocomplete="off">
           <span class="field-hint">Número del folio físico (guía, recibo, papel) que respalda esta entrada. Todos los materiales que agregues abajo se registrarán bajo este mismo folio.</span>
+        </div>
+
+        <div class="field field-full ent-devol-only" style="display:none">
+          <label>OT / Actividad de origen <span class="req">*</span></label>
+          <input type="text" id="ent-ot" placeholder="Ej. OT-12345">
+          <span class="field-hint">OT desde la que vuelve el material (obligatorio para devoluciones).</span>
+        </div>
+
+        <div class="field ent-devol-only" style="display:none">
+          <label>Motivo de devolución <span class="req">*</span></label>
+          <select id="ent-motivo" onchange="onEntMotivoChange()">
+            <option value="">— Selecciona —</option>
+            <option value="Excedente">Excedente</option>
+            <option value="Suspendido">Suspendido</option>
+            <option value="No utilizado">No utilizado</option>
+            <option value="Dañado">Dañado</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+
+        <div class="field ent-devol-only ent-motivo-otro" style="display:none">
+          <label>Detalle del motivo "Otro" <span class="req">*</span></label>
+          <input type="text" id="ent-motivo-otro" placeholder="Describe el motivo...">
         </div>
 
         <div class="field field-full">
@@ -2045,6 +2091,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       <select id="hist-type">
         <option value="">Todos los tipos</option>
         <option value="entrada">Solo entradas</option>
+        <option value="devolucion">↩ Solo devoluciones</option>
         <option value="salida">Solo salidas</option>
         <option value="reserva">Solo reservas</option>
         <option value="ajuste">Solo ajustes internos</option>
@@ -3055,15 +3102,26 @@ function renderEntItems(){
   const ct = document.getElementById('ent-items');
   if(!ct) return;
   if(!entFolioItems.length){
-    ct.innerHTML = '';   // CSS :empty::before muestra placeholder
+    ct.innerHTML = '';
     return;
   }
+  const isDevol = (document.querySelector('input[name="ent-subtype"]:checked')?.value === 'devolucion');
   const totalQty = entFolioItems.reduce((s,it)=>s+it.qty, 0);
   const rows = entFolioItems.map((it, idx)=>`
     <tr>
       <td>
         <div class="fi-name">${escHtml(it.material)}</div>
         <div class="fi-sap">${escHtml(it.clasif)} · SAP ${escHtml(it.sap ?? '—')}</div>
+        ${isDevol ? `
+        <div style="margin-top:5px">
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:2px">Estado devolución:</label>
+          <select class="item-estado" onchange="setEntItemEstado(${idx}, this.value)">
+            <option value="">— Selecciona —</option>
+            <option value="Nuevo/sin uso"        ${it.estadoDevol==='Nuevo/sin uso'?'selected':''}>Nuevo / sin uso</option>
+            <option value="Usado/reutilizable"   ${it.estadoDevol==='Usado/reutilizable'?'selected':''}>Usado / reutilizable</option>
+            <option value="Dañado/no conforme"   ${it.estadoDevol==='Dañado/no conforme'?'selected':''}>Dañado / no conforme</option>
+          </select>
+        </div>` : ''}
       </td>
       <td class="fi-qty">${fmtQty(it.qty)}</td>
       <td style="width:50px;text-align:center">
@@ -3071,7 +3129,7 @@ function renderEntItems(){
       </td>
     </tr>`).join('');
   ct.innerHTML = `<table class="folio-items-table">
-    <thead><tr><th>Material</th><th style="text-align:right">Cantidad</th><th></th></tr></thead>
+    <thead><tr><th>Material${isDevol?' (con estado devolución)':''}</th><th style="text-align:right">Cantidad</th><th></th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr>
       <td><strong>${entFolioItems.length}</strong> material${entFolioItems.length===1?'':'es'} en este folio</td>
@@ -3080,6 +3138,33 @@ function renderEntItems(){
     </tr></tfoot>
   </table>`;
 }
+
+function setEntItemEstado(idx, val){
+  if(entFolioItems[idx]) entFolioItems[idx].estadoDevol = val;
+}
+window.setEntItemEstado = setEntItemEstado;
+
+function onEntMotivoChange(){
+  const v = document.getElementById('ent-motivo').value;
+  document.querySelector('.ent-motivo-otro').style.display = (v === 'Otro') ? '' : 'none';
+}
+window.onEntMotivoChange = onEntMotivoChange;
+
+function onEntSubtypeChange(){
+  const isDevol = (document.querySelector('input[name="ent-subtype"]:checked')?.value === 'devolucion');
+  document.querySelectorAll('.ent-devol-only').forEach(el => {
+    el.style.display = isDevol ? '' : 'none';
+  });
+  if(!isDevol){
+    const otroEl = document.querySelector('.ent-motivo-otro');
+    if(otroEl) otroEl.style.display = 'none';
+  }
+  renderEntItems();
+}
+window.onEntSubtypeChange = onEntSubtypeChange;
+document.querySelectorAll('input[name="ent-subtype"]').forEach(r => {
+  r.addEventListener('change', onEntSubtypeChange);
+});
 
 function addEntItem(){
   const m = getSelectedMat('ent');
@@ -3106,11 +3191,16 @@ function removeEntItem(idx){
 
 document.getElementById('form-entrada').addEventListener('submit', e=>{
   e.preventDefault();
+  const subtype = document.querySelector('input[name="ent-subtype"]:checked')?.value || 'normal';
+  const isDevol = (subtype === 'devolucion');
   const folio = document.getElementById('ent-folio').value.trim();
   const area = document.querySelector('#ent-areas input:checked')?.value;
   const date = document.getElementById('ent-date').value || todayStr();
   const resp = document.getElementById('ent-resp').value.trim();
   const notes = document.getElementById('ent-notes').value.trim();
+  const ot = document.getElementById('ent-ot') ? document.getElementById('ent-ot').value.trim() : '';
+  const motivoDevol = isDevol ? document.getElementById('ent-motivo').value : '';
+  const motivoOtro = (isDevol && motivoDevol === 'Otro') ? document.getElementById('ent-motivo-otro').value.trim() : '';
 
   if(!folio){ toast('Ingresa el N° de folio','err'); return; }
   if(!area){ toast('Selecciona el área que recibe','err'); return; }
@@ -3119,33 +3209,54 @@ document.getElementById('form-entrada').addEventListener('submit', e=>{
     toast('Agrega al menos un material al folio','err');
     return;
   }
+  if(isDevol){
+    if(!ot){ toast('Ingresa la OT/actividad de origen (obligatorio en devolución)','err'); return; }
+    if(!motivoDevol){ toast('Selecciona el motivo de devolución','err'); return; }
+    if(motivoDevol === 'Otro' && !motivoOtro){ toast('Describe el motivo "Otro"','err'); return; }
+    const sinEstado = entFolioItems.filter(it => !it.estadoDevol);
+    if(sinEstado.length){
+      toast(`Falta el estado de devolución en ${sinEstado.length} material${sinEstado.length===1?'':'es'}`, 'err', 4500);
+      return;
+    }
+  }
 
   const ts = new Date().toISOString();
   let totalQty = 0;
-  // Generar un movimiento por material; comparten folio + datos comunes
   for(const it of entFolioItems){
     const mat = state.materials.find(x=>x.id===it.matId);
-    if(!mat){ continue; }   // safety: material removed entre add y submit
+    if(!mat){ continue; }
     mat.stock[area] = (mat.stock[area]||0) + it.qty;
     state.movements.push({
       id: state.nextMovId++,
       type: 'entrada',
+      subtype,                                  // 'normal' | 'devolucion'
       matId: mat.id, sap: mat.sap, material: mat.material, clasif: mat.clasif,
       area, qty: it.qty, date,
       timestamp: ts,
       user: state.user || '—',
       folio, resp, notes,
+      ot: isDevol ? ot : '',
+      motivoDevol: isDevol ? motivoDevol : '',
+      motivoOtro:  isDevol ? motivoOtro  : '',
+      estadoDevol: isDevol ? (it.estadoDevol || '') : '',
     });
     totalQty += it.qty;
   }
   saveState();
-  toast(`Entrada registrada: folio ${folio} · ${entFolioItems.length} material${entFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. → ${AREA_LABEL[area]}`, 'ok', 4500);
+  const label = isDevol ? '↩ Devolución registrada' : 'Entrada registrada';
+  const extra = isDevol ? `\nMotivo: ${motivoDevol}${motivoOtro?` (${motivoOtro})`:''}` : '';
+  toast(`${label}: folio ${folio} · ${entFolioItems.length} material${entFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. → ${AREA_LABEL[area]}${extra}`, 'ok', isDevol ? 5500 : 4500);
   resetEntrada();
 });
 
 function resetEntrada(){
   document.getElementById('form-entrada').reset();
   document.getElementById('ent-date').value = todayStr();
+  // reset radio a normal
+  const rNormal = document.querySelector('input[name="ent-subtype"][value="normal"]');
+  if(rNormal) rNormal.checked = true;
+  // ocultar campos devolución
+  document.querySelectorAll('.ent-devol-only').forEach(el => el.style.display = 'none');
   clearSel('ent');
   entFolioItems = [];
   renderEntItems();
@@ -4209,6 +4320,8 @@ function openMovDetail(movId){
   const cells = [
     { label: 'Tipo de movimiento',
       value: (() => {
+        const isDevol = !isSalida && mv.subtype === 'devolucion';
+        if(isDevol) return `<span class="mv-pill" style="background:#CCFBF1;color:#0F766E">↩ Devolución</span>`;
         if(!isSalida) return `<span class="mv-pill">${typeLabel}</span>`;
         const isTr = mv.isTransfer || isWarehouseDest(mv.destino);
         return isTr
@@ -4221,6 +4334,20 @@ function openMovDetail(movId){
   if(isSalida){
     cells.push({ label:'Destino', value: escHtml(DEST_LABEL[mv.destino]||mv.destino||'—') });
     cells.push({ label:'OT / N° actividad', value: escHtml(mv.ot||'—'), mono:true });
+  }
+  // Devolución: agregar OT, motivo, estado
+  if(!isSalida && mv.subtype === 'devolucion'){
+    cells.push({ label:'OT / Actividad de origen', value: escHtml(mv.ot||'—'), mono:true });
+    const motivoVal = mv.motivoDevol === 'Otro' && mv.motivoOtro
+      ? `Otro: ${escHtml(mv.motivoOtro)}`
+      : escHtml(mv.motivoDevol||'—');
+    cells.push({ label:'Motivo de devolución', value: motivoVal });
+    if(mv.estadoDevol){
+      const estadoColor = mv.estadoDevol.includes('Nuevo') ? '#16A34A'
+                       : mv.estadoDevol.includes('Usado') ? '#B45309'
+                       : '#DC2626';
+      cells.push({ label:'Estado del material', value:`<span style="color:${estadoColor};font-weight:600">${escHtml(mv.estadoDevol)}</span>` });
+    }
   }
   cells.push({
     label:'Responsable',
@@ -6272,9 +6399,16 @@ function renderHistorial(){
   // OR explicitly filters by "ajuste" type
   if(type === 'ajuste'){
     rows = rows.filter(r => r._adjustment);
+  } else if(type === 'devolucion'){
+    rows = rows.filter(r => r.type === 'entrada' && r.subtype === 'devolucion' && !r._adjustment);
   } else {
     if(!showAdj) rows = rows.filter(r => !r._adjustment);
-    if(type) rows = rows.filter(r => r.type === type);
+    if(type === 'entrada'){
+      // "Solo entradas" excluye devoluciones (van en su propia opción)
+      rows = rows.filter(r => r.type === 'entrada' && r.subtype !== 'devolucion');
+    } else if(type){
+      rows = rows.filter(r => r.type === type);
+    }
   }
   if(area) rows = rows.filter(r=>r.area===area);
   if(from) rows = rows.filter(r=>r.date >= from);
@@ -6343,12 +6477,16 @@ function renderHistorial(){
       </tr>`;
     }
     // Movement row (original layout)
+    const isDevol = r.type==='entrada' && r.subtype==='devolucion';
     const sign = r.type==='entrada' ? '+' : (r.type==='salida' ? '−' : '+');
-    const destCell = r.type==='salida' ? escHtml(DEST_LABEL[r.destino]||r.destino||'—') : '—';
+    const destCell = r.type==='salida' ? escHtml(DEST_LABEL[r.destino]||r.destino||'—')
+                   : (isDevol ? `<small style="color:#0D9488">↩ Devolución</small>` : '—');
     // Adjustments get a distinct tag instead of entrada/salida
     const typeTag = r._adjustment
       ? `<span class="tag" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A">Ajuste interno</span>`
-      : `<span class="tag ${r.type}">${r.type}</span>`;
+      : (isDevol
+          ? `<span class="tag" style="background:#CCFBF1;color:#0F766E;border-color:#5EEAD4">↩ Devolución</span>`
+          : `<span class="tag ${r.type}">${r.type}</span>`);
     return `<tr>
       <td>${escHtml(fmtDateTime(r.timestamp))}<br><small style="color:var(--muted)">${escHtml(fmtDate(r.date))}</small></td>
       <td>${typeTag}</td>
@@ -8510,6 +8648,45 @@ window.setPeriod = setPeriod;
 
 /* ============ CENTRO DE ALERTAS ============ */
 
+/* ============ ENTRADA — toggle tipo (normal / devolución) ============ */
+/* Reusa el patrón .area-pick. Override solo el color cuando es Devolución. */
+.ent-type-pick{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:4px}
+.ent-type-pick .opt{
+  padding:14px 14px 12px;
+  text-align:left;
+  position:relative;
+}
+.ent-type-pick .opt strong{
+  display:block;
+  font-size:14px;
+  color:var(--ink);
+  letter-spacing:.1px;
+  margin-bottom:3px;
+}
+.ent-type-pick .opt small{
+  display:block;
+  font-size:11.5px;
+  color:var(--muted);
+  line-height:1.35;
+}
+.ent-type-icon{
+  position:absolute;
+  top:11px; right:12px;
+  font-size:18px;
+  opacity:.55;
+  transition:opacity .15s;
+}
+.ent-type-pick input:checked + .opt .ent-type-icon{opacity:1}
+/* Override púrpura para "Devolución" (en vez del naranjo default) */
+.ent-type-pick .ent-type-devol input:checked + .opt{
+  border-color:#7E22CE !important;
+  background:#FAF5FF !important;
+  box-shadow:0 0 0 3px rgba(126,34,206,.1) !important;
+}
+.ent-type-pick .ent-type-devol input:checked + .opt strong{color:#6B21A8}
+.ent-type-pick .ent-type-devol input:checked + .opt small{color:#7E22CE}
+.folio-item-card .item-estado{ font-size:11px; padding:3px 6px; border-radius:5px; margin-top:4px; background:#fff; border:1px solid var(--line) }
+
 /* ============ REPORTES — gráficos + histórico ============ */
 .alerta-selector{
   display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
@@ -9620,6 +9797,10 @@ function sbMovementToRow(mv){
     is_imported: !!mv._imported,
     is_adjustment: !!mv._adjustment,
     device_id: SB_DEVICE_ID,
+    subtype:        mv.subtype      || 'normal',
+    motivo_devol:   mv.motivoDevol  || null,
+    motivo_otro:    mv.motivoOtro   || null,
+    estado_devol:   mv.estadoDevol  || null,
   };
 }
 function sbRowToMovement(r){
@@ -9644,6 +9825,10 @@ function sbRowToMovement(r){
   if(r.activity) mv.activity = r.activity;
   if(r.is_imported) mv._imported = true;
   if(r.is_adjustment) mv._adjustment = true;
+  if(r.subtype && r.subtype !== 'normal') mv.subtype = r.subtype;
+  if(r.motivo_devol) mv.motivoDevol = r.motivo_devol;
+  if(r.motivo_otro)  mv.motivoOtro  = r.motivo_otro;
+  if(r.estado_devol) mv.estadoDevol = r.estado_devol;
   // Backfill isTransfer flag from destino (since DB doesn't store it explicitly)
   if(mv.destino && typeof isWarehouseDest === 'function' && isWarehouseDest(mv.destino)){
     mv.isTransfer = true;
@@ -10073,6 +10258,7 @@ function sbMovSig(mv){
     d: mv.date||null, ts: mv.timestamp||null, u: mv.user||null, r: mv.resp||null,
     do: mv.folio||mv.doc||null, de: mv.destino||null, ot: mv.ot||null, ac: mv.activity||null,
     n: mv.notes||null,
+    st: mv.subtype||'normal', md: mv.motivoDevol||null, mo: mv.motivoOtro||null, ed: mv.estadoDevol||null,
   });
 }
 function sbRsvSig(r){
