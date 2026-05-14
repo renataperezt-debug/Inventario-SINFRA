@@ -1898,12 +1898,21 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         <option value="crit">Solo críticos</option>
         <option value="zero">Sin stock</option>
         <option value="ok">Con stock</option>
+        <option value="archived">🗑 Eliminados recientemente</option>
       </select>
       <select id="inv-rsv" title="Filtrar por reservas">
         <option value="">Reservas: todas</option>
         <option value="with">Solo con reservas activas</option>
         <option value="no-avail">Sin disponible (reservado ≥ stock)</option>
         <option value="without">Sin reservas</option>
+      </select>
+      <select id="inv-sap" title="Filtrar por estado de compra SAP">
+        <option value="">Estado SAP: todos</option>
+        <option value="pendiente">🔴 Solo pendientes</option>
+        <option value="parcial">🟠 Solo parciales</option>
+        <option value="listo">🟢 Solo listos</option>
+        <option value="any">Con reserva SAP (cualquier estado)</option>
+        <option value="none">Sin reserva SAP</option>
       </select>
       <select id="inv-area" title="Filtrar por ubicación / área">
         <option value="">Todas las ubicaciones</option>
@@ -1915,7 +1924,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       </select>
       <span class="count" id="inv-count">0 / 0</span>
       <button class="btn btn-sm" id="btn-load-sap" onclick="document.getElementById('file-sap-reservas').click()" title="Carga el Excel 'Copia de reservas Sinfra' descargado de SharePoint para vincular estado de compras por material.">📋 Cargar reservas SAP</button>
-      <input type="file" id="file-sap-reservas" accept=".xlsx,.xls" style="display:none" onchange="loadSapReservasFromFile(event)">
+      <input type="file" id="file-sap-reservas" accept=".xlsx,.xls,.xlsm,.xlsb,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none" onchange="loadSapReservasFromFile(event)">
     </div>
     <div class="table-wrap">
       <table class="t" id="inv-tbl">
@@ -2589,7 +2598,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       </div>
     </div>
     <div class="actions" style="margin-top:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <button class="btn btn-delete" id="em-delete" type="button" title="Eliminar este material del catálogo">
+      <button class="btn btn-delete" id="em-delete" type="button" title="Eliminar este material (se puede recuperar dentro de 30 días)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
         Eliminar material
       </button>
@@ -5174,6 +5183,27 @@ document.getElementById('em-save').addEventListener('click', ()=>{
 });
 
 // ---------- DELETE MATERIAL (from edit modal) ----------
+async function restoreMaterial(matId){
+  const m = state.materials.find(x=>x.id===matId);
+  if(!m || !m.deletedAt) return;
+  const ok = await confirmDialog(
+    'Recuperar material',
+    `Vas a recuperar al catálogo activo:<br><br><b>${escHtml(m.material)}</b><br><small style="color:var(--muted)">SAP ${escHtml(m.sap||'—')} · ${escHtml(m.clasif||'')}</small>`,
+    'Sí, recuperar',
+    false
+  );
+  if(!ok) return;
+  m.deletedAt = null;
+  if(typeof sbClient !== 'undefined' && sbClient && typeof sbPushMaterial === 'function'){
+    try { await sbPushMaterial(m); } catch(e){ console.error(e); }
+  }
+  saveState();
+  toast(`Material "${m.material}" recuperado al catálogo`, 'ok', 4000);
+  renderInventario();
+  renderDashboard();
+}
+window.restoreMaterial = restoreMaterial;
+
 document.getElementById('em-delete').addEventListener('click', async ()=>{
   if(!editingMatId) return;
   const m = state.materials.find(x=>x.id===editingMatId);
@@ -5199,31 +5229,33 @@ document.getElementById('em-delete').addEventListener('click', async ()=>{
   }
 
   const warnHistory = movs.length
-    ? `<br><br>⚠ Este material tiene <b>${movs.length} movimiento${movs.length===1?'':'s'}</b> en el historial. Esos registros se conservarán pero quedarán huérfanos (sin link al catálogo).`
+    ? `<br><br>ℹ El material tiene <b>${movs.length} movimiento${movs.length===1?'':'s'}</b> en el historial. Esos quedan registrados con el material aún ligado.`
     : '';
   const ok = await confirmDialog(
-    'Eliminar material del catálogo',
-    `Vas a eliminar definitivamente:<br><br><b>${escHtml(m.material)}</b><br><small style="color:var(--muted)">SAP ${escHtml(m.sap||'—')} · ${escHtml(m.clasif||'')}</small>${warnHistory}<br><br>Esta acción es permanente y se sincroniza a Supabase.`,
-    'Sí, eliminar material',
+    'Eliminar material',
+    `Vas a eliminar:<br><br><b>${escHtml(m.material)}</b><br><small style="color:var(--muted)">SAP ${escHtml(m.sap||'—')} · ${escHtml(m.clasif||'')}</small>${warnHistory}<br><br>Desaparece del catálogo activo. Puedes recuperarlo desde Inventario → filtro "🗑 Eliminados recientemente" durante <b>30 días</b>. Después se borra permanentemente.`,
+    'Sí, eliminar',
     true
   );
   if(!ok) return;
 
-  // Remove from local state
-  const idx = state.materials.findIndex(x=>x.id===editingMatId);
-  if(idx >= 0) state.materials.splice(idx, 1);
+  // Remove from local state (soft delete — keep in array, marca deletedAt)
+  m.deletedAt = new Date().toISOString();
 
-  // Delete from Supabase
+  // Push update to Supabase (mismo registro pero con deleted_at)
   if(typeof sbClient !== 'undefined' && sbClient){
     try {
-      if(typeof sbMarkPushed === 'function') sbMarkPushed('materials', m.id);
-      await sbClient.from('inv_materials').delete().eq('client_id', m.id);
-    } catch(e){ console.error('sb delete mat', e); }
+      if(typeof sbPushMaterial === 'function') await sbPushMaterial(m);
+      else {
+        // fallback: update column directly
+        if(typeof sbMarkPushed === 'function') sbMarkPushed('materials', m.id);
+        await sbClient.from('inv_materials').update({deleted_at: m.deletedAt}).eq('client_id', m.id);
+      }
+    } catch(e){ console.error('sb soft-del mat', e); }
   }
-  if(typeof sbMatSnapshot !== 'undefined') sbMatSnapshot.delete(m.id);
 
   saveState();
-  toast(`Material "${m.material}" eliminado`, 'ok', 4000);
+  toast(`Material "${m.material}" eliminado. Puedes recuperarlo en 30 días desde "🗑 Eliminados recientemente".`, 'ok', 5500);
 
   closeEditMat();
   renderInventario();
@@ -6230,8 +6262,15 @@ function renderInventario(){
   const stateFil = document.getElementById('inv-state').value;
   const areaFil = (document.getElementById('inv-area')||{}).value || '';
   const rsvFil = (document.getElementById('inv-rsv')||{}).value || '';
+  const sapFil = (document.getElementById('inv-sap')||{}).value || '';
 
   let mats = state.materials.slice();
+  // Filtro archivados: por defecto excluir; si elige "Solo archivados" mostrar solo esos
+  if(stateFil === 'archived'){
+    mats = mats.filter(m => m.deletedAt);
+  } else {
+    mats = mats.filter(m => !m.deletedAt);
+  }
   if(search) mats = mats.filter(m=>m.material.toLowerCase().includes(search) || String(m.sap||'').includes(search));
   if(clasif) mats = mats.filter(m=>m.clasif === clasif);
   if(stateFil==='crit') mats = mats.filter(m=>m.critico && m.critico.toLowerCase()!=='ok');
@@ -6247,6 +6286,16 @@ function renderInventario(){
   });
   // Ubicación filter: only show materials with stock > 0 in the selected area
   if(areaFil) mats = mats.filter(m=>(m.stock[areaFil]||0) > 0);
+
+  // Filtro por estado SAP
+  if(sapFil){
+    mats = mats.filter(m => {
+      const s = (typeof getSapEstadoForMat === 'function') ? getSapEstadoForMat(m) : null;
+      if(sapFil === 'none') return !s;
+      if(sapFil === 'any')  return !!s;
+      return s && s.estado === sapFil;
+    });
+  }
 
   // Toggle highlight class on table to dim non-selected area columns
   const tbl = document.getElementById('inv-tbl');
@@ -6289,15 +6338,26 @@ function renderInventario(){
         : '—'}</td>
       <td class="num"><b style="color:${availTot<=0?'var(--red)':(availTot<reservedTot?'#B45309':'var(--ink)')}">${availTot}</b></td>
       <td>${renderSapEstadoCell(m)}</td>
-      <td>${stateTag}</td>
-      <td><button class="tbl-edit" onclick="openEditMat(${m.id})" title="Editar especificaciones">✎ Editar</button></td>
+      <td>${m.deletedAt
+        ? (() => {
+            const days = Math.floor((Date.now() - new Date(m.deletedAt).getTime()) / 86400000);
+            const left = Math.max(0, 30 - days);
+            const col = left <= 7 ? '#DC2626' : left <= 15 ? '#EA580C' : '#6B7280';
+            return `<span class="tag" style="background:${col}22;color:${col};border-color:${col}66" title="Se borra permanentemente cuando lleguen 30 días">🗑 Hace ${days}d · borra en ${left}d</span>`;
+          })()
+        : stateTag
+      }</td>
+      <td>${m.deletedAt
+        ? `<button class="tbl-edit" style="background:var(--green-l);border-color:var(--green);color:var(--green)" onclick="restoreMaterial(${m.id})" title="Recuperar este material al catálogo activo">↩ Recuperar</button>`
+        : `<button class="tbl-edit" onclick="openEditMat(${m.id})" title="Editar especificaciones">✎ Editar</button>`
+      }</td>
     </tr>`;
   }).join('');
   if(mats.length > cap){
     tb.innerHTML += `<tr><td colspan="13" style="text-align:center;color:var(--muted);padding:14px">Mostrando primeros ${cap} de ${mats.length}. Refina los filtros para ver más.</td></tr>`;
   }
 }
-['inv-search','inv-clasif','inv-state','inv-area','inv-rsv'].forEach(id=>{const el=document.getElementById(id); if(el) el.addEventListener('input', renderInventario);});
+['inv-search','inv-clasif','inv-state','inv-area','inv-rsv','inv-sap'].forEach(id=>{const el=document.getElementById(id); if(el) el.addEventListener('input', renderInventario);});
 
 // ============================================================
 // SAP RESERVAS (compras) — carga desde Excel SharePoint
@@ -6305,82 +6365,224 @@ function renderInventario(){
 let sapReservasBySap = {};  // sap → [filas]
 
 async function loadSapReservasFromFile(ev){
+  console.log('[SAP] loadSapReservasFromFile triggered', ev);
   const file = ev.target.files && ev.target.files[0];
-  if(!file) return;
-  if(typeof XLSX === 'undefined'){ toast('Librería Excel no cargada, refresca','err'); return; }
-  toast('Procesando Excel...','warn',2000);
+  if(!file){
+    console.warn('[SAP] No file selected');
+    toast('No se seleccionó archivo','err');
+    return;
+  }
+  console.log(`[SAP] File: ${file.name} (${file.size} bytes)`);
+  toast(`Procesando ${file.name}...`,'warn',3000);
+
+  if(typeof XLSX === 'undefined'){
+    console.error('[SAP] XLSX library not loaded');
+    toast('Librería Excel (XLSX) no cargada. Refresca con Ctrl+Shift+R','err',6000);
+    ev.target.value = '';
+    return;
+  }
+
   try {
     const buf = await file.arrayBuffer();
+    console.log(`[SAP] Buffer size: ${buf.byteLength}`);
     const wb = XLSX.read(buf, {type:'array'});
-    // Usar Hoja3 — filtrada solo a usuarios SINFRA
-    const ws = wb.Sheets['Hoja3'];
-    if(!ws){ toast('No se encontró Hoja3 (datos filtrados a SINFRA)','err'); return; }
-    // Hoja3: header en fila 5, datos desde fila 6
-    // Columnas: Creado por | Nº Reserva | Nº Material (SAP) | Descripción | Solicitada | Despachada | Pendiente
-    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
-    let currentRsv = null;
-    const parsed = [];
-    for(let i = 5; i < rows.length; i++){
-      const r = rows[i];
-      if(!r || r.length < 7) continue;
-      const creadoPor = r[0] ? String(r[0]).trim() : null;
-      // Forward-fill num_reserva: si es 0 o vacío, usa el último válido
-      if(r[1] && r[1] !== 0 && String(r[1]).trim() !== '0'){
-        currentRsv = String(r[1]).trim();
-      }
-      const sap = r[2] ? String(r[2]).trim() : null;
-      if(!sap) continue;
-      // skip totales o filas vacías
-      if(!creadoPor && !currentRsv) continue;
-      parsed.push({
-        sap,
-        num_reserva: currentRsv,
-        num_posicion: null,
-        cant_solic: Number(r[4]) || 0,
-        cant_desp:  Number(r[5]) || 0,
-        cant_pend:  Number(r[6]) || 0,
-        fecha_necesidad: null,
-        borrado: false,
-        ot: null,
-        almacen: null,
-        creado_por: creadoPor,
-      });
+    console.log(`[SAP] Sheets: ${wb.SheetNames.join(', ')}`);
+
+    // Try Hoja3 first (filtered SINFRA), fall back to first sheet
+    let parsed = [];
+    let usedSheet = '';
+
+    if(wb.Sheets['Hoja3']){
+      console.log('[SAP] Trying Hoja3...');
+      parsed = parseHoja3(wb.Sheets['Hoja3']);
+      usedSheet = 'Hoja3';
+      console.log(`[SAP] Hoja3 → ${parsed.length} filas`);
     }
-    if(!parsed.length){ toast('No se encontraron reservas SINFRA en Hoja3','warn'); return; }
 
-    toast(`Subiendo ${parsed.length} reservas SAP a Supabase...`,'warn',3000);
+    // Si Hoja3 no dio resultados o no existe, intenta Hoja1 (toda Codelco)
+    if(!parsed.length && wb.Sheets['Hoja1']){
+      console.log('[SAP] Hoja3 vacía/no existe — usando Hoja1');
+      parsed = parseHoja1(wb.Sheets['Hoja1']);
+      usedSheet = 'Hoja1';
+      console.log(`[SAP] Hoja1 → ${parsed.length} filas`);
+    }
 
-    if(typeof sbClient === 'undefined' || !sbClient){
-      sapReservasBySap = {};
-      parsed.forEach(p => { (sapReservasBySap[p.sap] = sapReservasBySap[p.sap] || []).push(p); });
-      try { localStorage.setItem('inv_sap_reservas', JSON.stringify(parsed)); } catch(e){}
-      renderInventario();
-      toast(`✓ ${parsed.length} reservas cargadas (modo local)`,'ok',4000);
+    // Última opción: primera hoja con datos
+    if(!parsed.length){
+      for(const name of wb.SheetNames){
+        if(name.startsWith('_')) continue;
+        console.log(`[SAP] Intentando hoja "${name}"...`);
+        parsed = parseHoja3(wb.Sheets[name]);
+        if(parsed.length){ usedSheet = name; break; }
+      }
+    }
+
+    if(!parsed.length){
+      toast('El Excel no contiene reservas reconocibles. Revisa que sea el archivo correcto.','err',6000);
+      ev.target.value = '';
       return;
     }
 
+    console.log(`[SAP] ${parsed.length} reservas parseadas desde "${usedSheet}"`);
+    console.log('[SAP] Primer registro:', parsed[0]);
+    toast(`Encontradas ${parsed.length} reservas en ${usedSheet}. Subiendo...`,'warn',3000);
+
+    // Sin Supabase: solo localStorage
+    if(typeof sbClient === 'undefined' || !sbClient){
+      sapReservasBySap = {};
+      parsed.forEach(p => { (sapReservasBySap[p.sap] = sapReservasBySap[p.sap] || []).push(p); });
+      try { localStorage.setItem('inv_sap_reservas', JSON.stringify(parsed)); } catch(e){ console.warn(e); }
+      renderInventario();
+      toast(`✓ ${parsed.length} reservas cargadas (modo local, sin sync)`,'ok',5000);
+      ev.target.value = '';
+      return;
+    }
+
+    // Supabase: borrar y reinsertar
     try {
-      await sbClient.from('inv_sap_reservas').delete().neq('id', -1);
-    } catch(e){ console.warn('delete old', e); }
+      const delRes = await sbClient.from('inv_sap_reservas').delete().neq('id', -1);
+      console.log('[SAP] Delete antiguas:', delRes);
+    } catch(e){ console.warn('[SAP] delete error (puede ser primera vez):', e); }
+
     const CHUNK = 500;
     let inserted = 0;
     for(let i = 0; i < parsed.length; i += CHUNK){
       const slice = parsed.slice(i, i+CHUNK);
-      const { error } = await sbClient.from('inv_sap_reservas').insert(slice);
-      if(error){ console.error('insert', error); toast(`Error insert: ${error.message}`,'err',6000); break; }
+      const { data, error } = await sbClient.from('inv_sap_reservas').insert(slice);
+      if(error){
+        console.error('[SAP] Insert error:', error);
+        toast(`Error subiendo a Supabase: ${error.message}. Revisa la consola (F12).`,'err',8000);
+        break;
+      }
       inserted += slice.length;
+      console.log(`[SAP] Insert chunk: ${inserted}/${parsed.length}`);
     }
-    await loadSapReservasFromSupabase();
-    renderInventario();
-    toast(`✓ ${inserted} reservas SAP cargadas y sincronizadas`,'ok',5000);
+
+    if(inserted > 0){
+      await loadSapReservasFromSupabase();
+      renderInventario();
+      toast(`✓ ${inserted} reservas SAP cargadas desde ${usedSheet}`,'ok',5500);
+    }
   } catch(e){
-    console.error('parse excel', e);
-    toast(`Error procesando Excel: ${e.message}`,'err',6000);
+    console.error('[SAP] EXCEPCIÓN:', e);
+    toast(`Error procesando Excel: ${e.message}. Abre F12 → Console y pásame el error.`,'err',8000);
   } finally {
     ev.target.value = '';
   }
 }
 window.loadSapReservasFromFile = loadSapReservasFromFile;
+
+// Parser de Hoja3 (filtrada a SINFRA): header en fila 5, datos desde fila 6
+// Cols: Creado por | Nº Reserva | Nº Material | Descripción | Solicitada | Despachada | Pendiente
+function parseHoja3(ws){
+  if(!ws) return [];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+  // Buscar fila de header automáticamente (que tenga "Nº Material" o "Numero de Material")
+  let headerRow = -1;
+  for(let i = 0; i < Math.min(20, rows.length); i++){
+    const r = rows[i] || [];
+    const joined = r.map(x => String(x||'').toLowerCase()).join('|');
+    if(joined.includes('material') && (joined.includes('reserva') || joined.includes('solici'))){
+      headerRow = i;
+      break;
+    }
+  }
+  if(headerRow < 0) return [];
+
+  // Detectar índices de columnas
+  const hdr = (rows[headerRow]||[]).map(x => String(x||'').toLowerCase());
+  const findCol = (...keywords) => {
+    for(let i = 0; i < hdr.length; i++){
+      if(keywords.some(k => hdr[i].includes(k))) return i;
+    }
+    return -1;
+  };
+  const colCreado = findCol('creado');
+  const colReserva = findCol('reserva');
+  const colSap = findCol('material');
+  const colSolic = findCol('solicitada','solicit');
+  const colDesp = findCol('despachada','despach');
+  const colPend = findCol('pendiente','pend');
+
+  if(colSap < 0 || colSolic < 0){
+    console.warn('[SAP] Hoja3: no encontró cols SAP o Solicitada', {hdr, colSap, colSolic});
+    return [];
+  }
+
+  let currentRsv = null;
+  const parsed = [];
+  for(let i = headerRow + 1; i < rows.length; i++){
+    const r = rows[i];
+    if(!r) continue;
+    const creadoPor = (colCreado>=0 && r[colCreado]) ? String(r[colCreado]).trim() : null;
+    const rsvCell = colReserva>=0 ? r[colReserva] : null;
+    if(rsvCell && rsvCell !== 0 && String(rsvCell).trim() !== '0'){
+      currentRsv = String(rsvCell).trim();
+    }
+    const sap = r[colSap] ? String(r[colSap]).trim() : null;
+    if(!sap) continue;
+    if(!creadoPor && !currentRsv) continue;
+    parsed.push({
+      sap,
+      num_reserva: currentRsv,
+      num_posicion: null,
+      cant_solic: Number(r[colSolic]) || 0,
+      cant_desp:  colDesp>=0 ? (Number(r[colDesp]) || 0) : 0,
+      cant_pend:  colPend>=0 ? (Number(r[colPend]) || 0) : 0,
+      fecha_necesidad: null,
+      borrado: false,
+      ot: null,
+      almacen: null,
+      creado_por: creadoPor,
+    });
+  }
+  return parsed;
+}
+
+// Parser de Hoja1 (toda Codelco) — fallback con estructura distinta
+function parseHoja1(ws){
+  if(!ws) return [];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+  // header esperado en row 2 (index 1): "Numero de Reserva" en col 0
+  let headerRow = -1;
+  for(let i = 0; i < Math.min(10, rows.length); i++){
+    const r = rows[i]||[];
+    const j = r.map(x => String(x||'').toLowerCase()).join('|');
+    if(j.includes('numero de material') || j.includes('número de material')){
+      headerRow = i; break;
+    }
+  }
+  if(headerRow < 0) return [];
+
+  const SINFRA_USERS = new Set(['GLOPE012','CVALE009','IVAOLGU','BCOVA001','VRUBI005']);
+  let currentRsv = null;
+  const parsed = [];
+  for(let i = headerRow + 1; i < rows.length; i++){
+    const r = rows[i];
+    if(!r) continue;
+    if(r[0]) currentRsv = String(r[0]).trim();
+    const sap = r[6] ? String(r[6]).trim() : null;
+    if(!sap) continue;
+    const creadoPor = r[17] ? String(r[17]).trim() : null;
+    if(!SINFRA_USERS.has(creadoPor)) continue;   // filtra solo SINFRA
+    const borrado = r[16] && String(r[16]).toLowerCase().includes('elimina');
+    if(borrado) continue;
+    parsed.push({
+      sap,
+      num_reserva: currentRsv,
+      num_posicion: r[1] != null ? String(r[1]) : null,
+      cant_solic: Number(r[19]) || 0,
+      cant_desp:  Number(r[20]) || 0,
+      cant_pend:  Number(r[21]) || 0,
+      fecha_necesidad: r[14] ? String(r[14]) : null,
+      borrado: false,
+      ot: r[2] && r[2] !== '#' ? String(r[2]) : null,
+      almacen: r[4] ? String(r[4]) : null,
+      creado_por: creadoPor,
+    });
+  }
+  return parsed;
+}
 
 async function loadSapReservasFromSupabase(){
   if(typeof sbClient === 'undefined' || !sbClient){
@@ -6487,6 +6689,36 @@ window.openSapDetail = openSapDetail;
 
 // Cargar al iniciar
 setTimeout(()=>{ try{ loadSapReservasFromSupabase().then(()=>renderInventario()); }catch(e){} }, 2500);
+
+// ---------- AUTO-PURGA: eliminar definitivo materiales eliminados hace +30 días ----------
+async function autoPurgeOldDeleted(){
+  const THRESHOLD_DAYS = 30;
+  const cutoff = new Date(Date.now() - THRESHOLD_DAYS * 24*60*60*1000);
+  const toPurge = state.materials.filter(m => {
+    if(!m.deletedAt) return false;
+    const d = new Date(m.deletedAt);
+    return !isNaN(d) && d < cutoff;
+  });
+  if(!toPurge.length) return;
+  console.log(`[purge] ${toPurge.length} materiales eliminados hace +${THRESHOLD_DAYS} días, borrando permanentemente...`);
+  for(const m of toPurge){
+    // Local
+    const idx = state.materials.findIndex(x=>x.id===m.id);
+    if(idx>=0) state.materials.splice(idx,1);
+    // Supabase
+    if(typeof sbClient !== 'undefined' && sbClient){
+      try {
+        if(typeof sbMarkPushed === 'function') sbMarkPushed('materials', m.id);
+        await sbClient.from('inv_materials').delete().eq('client_id', m.id);
+      } catch(e){ console.error('[purge] sb del', e); }
+    }
+    if(typeof sbMatSnapshot !== 'undefined') sbMatSnapshot.delete(m.id);
+  }
+  saveState();
+  console.log(`[purge] ${toPurge.length} materiales borrados permanentemente`);
+}
+// Corre 8 seg después del load (dejar que cargue Supabase primero)
+setTimeout(()=>{ try{ autoPurgeOldDeleted(); }catch(e){ console.error(e); } }, 8000);
 
 
 // ---------- HISTORIAL ----------
@@ -9879,6 +10111,7 @@ function sbMaterialToRow(m){
     stock_nivel17:     Number(m.stock?.Nivel17)      || 0,
     stock_ventiladores:Number(m.stock?.Ventiladores) || 0,
     min_stock:         Number(m.minStock)            || 0,
+    deleted_at:        m.deletedAt || null,
     specs: m.specs || null,
     updated_at: new Date().toISOString(),
     device_id: SB_DEVICE_ID,
@@ -9899,6 +10132,7 @@ function sbRowToMaterial(r){
       Ventiladores: Number(r.stock_ventiladores) || 0,
     },
     minStock: Number(r.min_stock) || 0,
+    deletedAt: r.deleted_at || null,
     specs: r.specs || null,
   };
 }
@@ -10101,7 +10335,7 @@ async function sbInitialLoad(){
     sbSetStatus('connecting');
 
     // Materials (paged) — request only needed columns to save egress
-    const matCols = 'client_id,clasif,material,sap,critico,stock_km15,stock_reactivos,stock_pmfc,stock_nivel17,stock_ventiladores,min_stock,specs';
+    const matCols = 'client_id,clasif,material,sap,critico,stock_km15,stock_reactivos,stock_pmfc,stock_nivel17,stock_ventiladores,min_stock,specs,deleted_at';
     let allMats = [];
     let from = 0; const pageSize = 1000;
     while(true){
@@ -10377,7 +10611,7 @@ function sbMatSig(m){
     cr: m.critico||'ok', sk: Number(m.stock?.KM15)||0, sr: Number(m.stock?.Reactivos)||0,
     sf: Number(m.stock?.PMFC)||0,
     sn: Number(m.stock?.Nivel17)||0, sv: Number(m.stock?.Ventiladores)||0,
-    sp: m.specs||null, ms: Number(m.minStock)||0,
+    sp: m.specs||null, ms: Number(m.minStock)||0, da: m.deletedAt||null,
   });
 }
 function sbMovSig(mv){
