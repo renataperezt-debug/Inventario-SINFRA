@@ -2820,8 +2820,18 @@ function fmtDateTime(iso){
   return `${z(d.getDate())}/${z(d.getMonth()+1)}/${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())}`;
 }
 function fmtDate(iso){
-  const d = new Date(iso);
-  if(isNaN(d)) return iso || '';
+  if(!iso) return '';
+  // Si es un string YYYY-MM-DD (fecha sin hora) lo parseamos literal,
+  // sin pasar por new Date() que lo interpreta como UTC y desplaza el día.
+  const s = String(iso);
+  const isoDateOnly = /^\d{4}-\d{2}-\d{2}$/.exec(s);
+  if(isoDateOnly){
+    const [y, m, d] = s.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  // Para timestamps con hora (ISO completo), Date funciona bien.
+  const d = new Date(s);
+  if(isNaN(d)) return s;
   const z = n=>String(n).padStart(2,'0');
   return `${z(d.getDate())}/${z(d.getMonth()+1)}/${d.getFullYear()}`;
 }
