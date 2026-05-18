@@ -1313,20 +1313,6 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
   </div>
 </div>
 
-<!-- ============== SYNC DETAILS MODAL ============== -->
-<div class="sync-modal" id="sync-details-modal" onclick="if(event.target===this) closeSyncDetails()">
-  <div class="card">
-    <h3>Estado de sincronización</h3>
-    <p class="muted">Detalle del estado actual de la conexión con SharePoint.</p>
-    <div id="sync-details-body"></div>
-    <div class="actions" style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">
-      <button class="btn btn-ghost" onclick="closeSyncDetails()">Cerrar</button>
-      <button class="btn btn-secondary" onclick="forceSyncNow()">Sincronizar ahora</button>
-      <button class="btn btn-primary" onclick="closeSyncDetails(); switchView('config'); setTimeout(()=>{const e=document.getElementById('sync-apply-url'); if(e) e.scrollIntoView({behavior:'smooth',block:'center'})}, 300);">Ir a configuración</button>
-    </div>
-  </div>
-</div>
-
 <!-- ============== EARLY GATE — runs synchronously to prevent FOUC ============== -->
 <script>
 (function(){
@@ -1361,10 +1347,6 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       </div>
     </div>
     <h1>Sistema de Inventario de Materiales</h1>
-    <div class="sync-pill" id="hdr-sync-pill" onclick="openSyncDetails(event)" title="Estado de sincronización">
-      <span class="sync-dot" id="sync-dot"></span>
-      <span id="sync-text">Local</span>
-    </div>
     <div class="user-pill" id="hdr-user-pill" onclick="toggleUserMenu(event)" title="Cambiar de usuario">
       <span class="dot"></span>
       <span id="hdr-user">Operador</span>
@@ -1694,7 +1676,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         <div class="field">
           <label>OT / N° Actividad <span class="req">*</span></label>
           <input type="text" id="sal-ot" placeholder="Ej. OT-12345">
-          <span class="field-hint">💡 Si el destino es el mismo taller de origen (ej. KM 15 → KM 15) es <b>autoconsumo</b> y la OT no es obligatoria.</span>
+          <span class="field-hint">💡 Si el destino es el mismo taller de origen (ej. KM 15 → KM 15) se registra como <b>autoconsumo</b>.</span>
         </div>
 
         <div class="field">
@@ -2325,38 +2307,6 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       Bloquear
     </button>
-  </div>
-
-  <div class="card">
-    <div class="card-h" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <span>Sincronización online · SharePoint</span>
-      <span id="sync-card-status" style="font-size:11px;font-weight:500;color:var(--muted);font-family:'Roboto Mono',monospace"></span>
-    </div>
-    <p style="color:var(--muted);font-size:14px;margin:0 0 14px">
-      Conecta este inventario a una <b>Lista de SharePoint</b> vía <b>Power Automate</b> para que varias personas trabajen en paralelo. Pide a TI que cree los flows según el instructivo y pega aquí las URLs.
-    </p>
-    <div class="sync-toggle">
-      <input type="checkbox" id="sync-enabled">
-      <label for="sync-enabled">Activar sincronización online</label>
-    </div>
-    <div class="sync-grid">
-      <div class="sync-row">
-        <label for="sync-apply-url">URL de envío (POST)</label>
-        <input type="text" id="sync-apply-url" placeholder="https://prod-XX.westus.logic.azure.com/workflows/.../triggers/.../paths/invoke?...">
-      </div>
-      <div class="sync-row">
-        <label for="sync-read-url">URL de lectura (GET)</label>
-        <input type="text" id="sync-read-url" placeholder="https://prod-XX.westus.logic.azure.com/workflows/.../triggers/.../paths/invoke?...">
-      </div>
-    </div>
-    <div class="actions" style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="saveSyncSettings()">Guardar configuración</button>
-      <button class="btn btn-secondary" onclick="testSyncConnection()">Probar conexión</button>
-      <button class="btn btn-ghost" onclick="forceSyncNow()">Sincronizar ahora</button>
-    </div>
-    <p class="sync-help">
-      Las URLs te las entrega TI cuando crea los flows en Power Automate. Mientras esto esté apagado, el inventario funciona <b>solo en este navegador</b> (modo local). Identificador único de este equipo: <code id="sync-device-id">—</code>
-    </p>
   </div>
 
   <div class="card">
@@ -3466,9 +3416,9 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
   if(!area){ toast('Selecciona el área que entrega','err'); return; }
   if(!destino){ toast('Selecciona el destino del material','err'); return; }
   if(!resp){ toast('Indica quien retira','err'); return; }
-  // Autoconsumo = mismo taller de origen y destino (no requiere OT)
+  // Autoconsumo = mismo taller de origen y destino (OT sigue siendo obligatoria)
   const isAutoconsumo = (area === destino);
-  if(!isAutoconsumo && !ot){ toast('Indica la OT o N° de actividad','err'); return; }
+  if(!ot){ toast('Indica la OT o N° de actividad','err'); return; }
   if(!salFolioItems.length){
     toast('Agrega al menos un material al folio','err');
     return;
