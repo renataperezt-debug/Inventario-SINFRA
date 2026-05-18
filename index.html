@@ -2854,6 +2854,13 @@ document.querySelectorAll('.tab').forEach(t=>{
 function switchView(v){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.view===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active', s.id==='view-'+v));
+  // Si la pestaña quedó abierta de un día anterior, la fecha guardada en el input quedó vieja.
+  // Refresca SOLO si el valor actual es anterior a hoy (no toca fechas que el usuario eligió a futuro).
+  const today = todayStr();
+  ['ent-date','sal-date','rsv-date'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el && (!el.value || el.value < today)) el.value = today;
+  });
   if(v==='dashboard') renderDashboard();
   if(v==='inventario') renderInventario();
   if(v==='historial') renderHistorial();
@@ -3265,7 +3272,14 @@ document.getElementById('form-entrada').addEventListener('submit', e=>{
   const isDevol = (subtype === 'devolucion');
   const folio = document.getElementById('ent-folio').value.trim();
   const area = document.querySelector('#ent-areas input:checked')?.value;
-  const date = document.getElementById('ent-date').value || todayStr();
+    let date = document.getElementById('ent-date').value || todayStr();
+  // Protección: si la fecha del input quedó vieja (página abierta de otro día), forzar hoy
+  const _today_ent = todayStr();
+  if(date < _today_ent){
+    console.log(`[date-fix] ent-date era ${date}, ajustando a hoy ${_today_ent}`);
+    date = _today_ent;
+    document.getElementById('ent-date').value = _today_ent;
+  }
   const resp = document.getElementById('ent-resp').value.trim();
   const notes = document.getElementById('ent-notes').value.trim();
   const ot = document.getElementById('ent-ot') ? document.getElementById('ent-ot').value.trim() : '';
@@ -3420,7 +3434,13 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
   const folio = document.getElementById('sal-folio').value.trim();
   const area = document.querySelector('#sal-areas input:checked')?.value;
   const destino = document.querySelector('#sal-destinos input:checked')?.value;
-  const date = document.getElementById('sal-date').value || todayStr();
+    let date = document.getElementById('sal-date').value || todayStr();
+  const _today_sal = todayStr();
+  if(date < _today_sal){
+    console.log(`[date-fix] sal-date era ${date}, ajustando a hoy ${_today_sal}`);
+    date = _today_sal;
+    document.getElementById('sal-date').value = _today_sal;
+  }
   const resp = document.getElementById('sal-resp').value.trim();
   const ot = document.getElementById('sal-ot').value.trim();
   const activity = document.getElementById('sal-act').value.trim();
