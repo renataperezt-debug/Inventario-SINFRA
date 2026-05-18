@@ -1694,6 +1694,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         <div class="field">
           <label>OT / N° Actividad <span class="req">*</span></label>
           <input type="text" id="sal-ot" placeholder="Ej. OT-12345">
+          <span class="field-hint">💡 Si el destino es el mismo taller de origen (ej. KM 15 → KM 15) es <b>autoconsumo</b> y la OT no es obligatoria.</span>
         </div>
 
         <div class="field">
@@ -2139,6 +2140,7 @@ tr.rsv-inactive td:nth-child(10){opacity:1}
         <option value="entrada">Solo entradas</option>
         <option value="devolucion">↩ Solo devoluciones</option>
         <option value="salida">Solo salidas</option>
+        <option value="autoconsumo">♻ Solo autoconsumo</option>
         <option value="reserva">Solo reservas</option>
         <option value="ajuste">Solo ajustes internos</option>
       </select>
@@ -3464,7 +3466,9 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
   if(!area){ toast('Selecciona el área que entrega','err'); return; }
   if(!destino){ toast('Selecciona el destino del material','err'); return; }
   if(!resp){ toast('Indica quien retira','err'); return; }
-  if(!ot){ toast('Indica la OT o N° de actividad','err'); return; }
+  // Autoconsumo = mismo taller de origen y destino (no requiere OT)
+  const isAutoconsumo = (area === destino);
+  if(!isAutoconsumo && !ot){ toast('Indica la OT o N° de actividad','err'); return; }
   if(!salFolioItems.length){
     toast('Agrega al menos un material al folio','err');
     return;
@@ -3517,7 +3521,8 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
   const ts = new Date().toISOString();
   let totalQty = 0;
   let firstMovIdForReservation = null;
-  const isTransfer = isWarehouseDest(destino);
+  // Si origen == destino taller, es autoconsumo (solo descuenta, no suma a destino)
+  const isTransfer = isWarehouseDest(destino) && !isAutoconsumo;
   // Generar un movimiento por línea del folio
   for(const it of salFolioItems){
     const mat = state.materials.find(x=>x.id===it.matId);
@@ -3527,7 +3532,7 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
     for(const a of AREAS){ if(typeof mat.stock[a.key] !== 'number') mat.stock[a.key] = Number(mat.stock[a.key])||0; }
     // Descontar siempre del origen
     mat.stock[area] = (mat.stock[area]||0) - it.qty;
-    // Si el destino es taller → también SUMAR al destino (transferencia interna)
+    // Si el destino es taller distinto → también SUMAR al destino (transferencia interna)
     if(isTransfer){
       mat.stock[destino] = (mat.stock[destino]||0) + it.qty;
     }
@@ -3535,13 +3540,14 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
     state.movements.push({
       id: movId,
       type: 'salida',
+      subtype: isAutoconsumo ? 'autoconsumo' : 'normal',
       matId: mat.id, sap: mat.sap, material: mat.material, clasif: mat.clasif,
       area, destino, qty: it.qty, date,
       timestamp: ts,
       user: state.user || '—',
       folio, resp, ot, activity, notes,
-      isTransfer,                   // true si destino es taller
-      destType: isTransfer ? 'warehouse' : 'consumption',
+      isTransfer,                   // true si destino es taller distinto al origen
+      destType: isTransfer ? 'warehouse' : (isAutoconsumo ? 'autoconsumo' : 'consumption'),
     });
     totalQty += it.qty;
     if(firstMovIdForReservation === null){ firstMovIdForReservation = movId; }
@@ -3570,13 +3576,16 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
     try{ syncPushEvent(buildReservationEvent('reservation_fulfilled', fulfilledRsv)); }catch(e){}
   }
 
-  const labelMov = isTransfer ? 'Transferencia ↔' : 'Salida';
-  const arrow = isTransfer ? '↔' : '→';
+  const labelMov = isAutoconsumo ? 'Autoconsumo' : (isTransfer ? 'Transferencia ↔' : 'Salida');
+  const arrow = isAutoconsumo ? '↺' : (isTransfer ? '↔' : '→');
+  const extraNote = isAutoconsumo
+    ? '\n♻ Material consumido dentro del mismo taller.'
+    : (isTransfer ? '\n📦 Stock movido automáticamente entre talleres.' : '');
   toast(
     fulfilledRsv
-      ? `${labelMov} confirmada y reserva #${fulfilledRsv.id} cumplida: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} ${arrow} ${DEST_LABEL[destino]}${isTransfer ? '\n📦 Stock movido automáticamente entre talleres.' : ''}`
-      : `${labelMov} registrada: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} ${arrow} ${DEST_LABEL[destino]}${isTransfer ? '\n📦 Stock movido automáticamente entre talleres.' : ''}`,
-    'ok', isTransfer ? 5500 : 4500);
+      ? `${labelMov} confirmada y reserva #${fulfilledRsv.id} cumplida: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} ${arrow} ${DEST_LABEL[destino]}${extraNote}`
+      : `${labelMov} registrada: folio ${folio} · ${salFolioItems.length} material${salFolioItems.length===1?'':'es'} · ${fmtQty(totalQty)} unid. ${AREA_LABEL[area]} ${arrow} ${DEST_LABEL[destino]}${extraNote}`,
+    'ok', isAutoconsumo ? 5000 : (isTransfer ? 5500 : 4500));
   resetSalida();
 });
 
@@ -4207,9 +4216,15 @@ function renderOtAnalysis(){
   movs.forEach(m=>{
     let key, label, sub;
     if(grouping === 'ot'){
-      key = m.ot || '(sin OT)';
-      label = key;
-      sub = m.activity ? escHtml(m.activity).slice(0,80) : '';
+      if(m.subtype === 'autoconsumo'){
+        key = '__autoconsumo__';
+        label = 'Actividades de autoconsumo';
+        sub = '♻ Consumo dentro del mismo taller';
+      } else {
+        key = m.ot || '(sin OT)';
+        label = key;
+        sub = m.activity ? escHtml(m.activity).slice(0,80) : '';
+      }
     } else if(grouping === 'destino'){
       key = m.destino || '(sin destino)';
       label = DEST_LABEL[key] || key;
@@ -4435,7 +4450,9 @@ function openMovDetail(movId){
     { label: 'Tipo de movimiento',
       value: (() => {
         const isDevol = !isSalida && mv.subtype === 'devolucion';
+        const isAuto  = isSalida  && mv.subtype === 'autoconsumo';
         if(isDevol) return `<span class="mv-pill" style="background:#CCFBF1;color:#0F766E">↩ Devolución</span>`;
+        if(isAuto)  return `<span class="mv-pill" style="background:#F3E8FF;color:#6B21A8">♻ Autoconsumo (mismo taller)</span>`;
         if(!isSalida) return `<span class="mv-pill">${typeLabel}</span>`;
         const isTr = mv.isTransfer || isWarehouseDest(mv.destino);
         return isTr
@@ -6791,11 +6808,15 @@ function renderHistorial(){
     rows = rows.filter(r => r._adjustment);
   } else if(type === 'devolucion'){
     rows = rows.filter(r => r.type === 'entrada' && r.subtype === 'devolucion' && !r._adjustment);
+  } else if(type === 'autoconsumo'){
+    rows = rows.filter(r => r.type === 'salida' && r.subtype === 'autoconsumo' && !r._adjustment);
   } else {
     if(!showAdj) rows = rows.filter(r => !r._adjustment);
     if(type === 'entrada'){
-      // "Solo entradas" excluye devoluciones (van en su propia opción)
       rows = rows.filter(r => r.type === 'entrada' && r.subtype !== 'devolucion');
+    } else if(type === 'salida'){
+      // "Solo salidas" excluye autoconsumo (van en su propia opción)
+      rows = rows.filter(r => r.type === 'salida' && r.subtype !== 'autoconsumo');
     } else if(type){
       rows = rows.filter(r => r.type === type);
     }
@@ -6868,15 +6889,19 @@ function renderHistorial(){
     }
     // Movement row (original layout)
     const isDevol = r.type==='entrada' && r.subtype==='devolucion';
+    const isAuto  = r.type==='salida'  && r.subtype==='autoconsumo';
     const sign = r.type==='entrada' ? '+' : (r.type==='salida' ? '−' : '+');
-    const destCell = r.type==='salida' ? escHtml(DEST_LABEL[r.destino]||r.destino||'—')
-                   : (isDevol ? `<small style="color:#0D9488">↩ Devolución</small>` : '—');
+    const destCell = r.type==='salida'
+      ? (isAuto ? `<small style="color:#6B21A8">♻ Autoconsumo</small>` : escHtml(DEST_LABEL[r.destino]||r.destino||'—'))
+      : (isDevol ? `<small style="color:#0D9488">↩ Devolución</small>` : '—');
     // Adjustments get a distinct tag instead of entrada/salida
     const typeTag = r._adjustment
       ? `<span class="tag" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A">Ajuste interno</span>`
       : (isDevol
           ? `<span class="tag" style="background:#CCFBF1;color:#0F766E;border-color:#5EEAD4">↩ Devolución</span>`
-          : `<span class="tag ${r.type}">${r.type}</span>`);
+          : isAuto
+            ? `<span class="tag" style="background:#F3E8FF;color:#6B21A8;border-color:#D8B4FE">♻ Autoconsumo</span>`
+            : `<span class="tag ${r.type}">${r.type}</span>`);
     return `<tr>
       <td>${escHtml(fmtDateTime(r.timestamp))}</td>
       <td>${typeTag}</td>
