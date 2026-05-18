@@ -3273,13 +3273,10 @@ document.getElementById('form-entrada').addEventListener('submit', e=>{
   const folio = document.getElementById('ent-folio').value.trim();
   const area = document.querySelector('#ent-areas input:checked')?.value;
     let date = document.getElementById('ent-date').value || todayStr();
-  // Protección: si la fecha del input quedó vieja (página abierta de otro día), forzar hoy
-  const _today_ent = todayStr();
-  if(date < _today_ent){
-    console.log(`[date-fix] ent-date era ${date}, ajustando a hoy ${_today_ent}`);
-    date = _today_ent;
-    document.getElementById('ent-date').value = _today_ent;
-  }
+  // Protección fuerte: la fecha del movimiento SIEMPRE es la del momento del registro.
+  // El input del form es solo informativo. Esto previene que pestañas viejas guarden ayer.
+  date = todayStr();
+  document.getElementById('ent-date').value = date;
   const resp = document.getElementById('ent-resp').value.trim();
   const notes = document.getElementById('ent-notes').value.trim();
   const ot = document.getElementById('ent-ot') ? document.getElementById('ent-ot').value.trim() : '';
@@ -3435,12 +3432,8 @@ document.getElementById('form-salida').addEventListener('submit', async e=>{
   const area = document.querySelector('#sal-areas input:checked')?.value;
   const destino = document.querySelector('#sal-destinos input:checked')?.value;
     let date = document.getElementById('sal-date').value || todayStr();
-  const _today_sal = todayStr();
-  if(date < _today_sal){
-    console.log(`[date-fix] sal-date era ${date}, ajustando a hoy ${_today_sal}`);
-    date = _today_sal;
-    document.getElementById('sal-date').value = _today_sal;
-  }
+  date = todayStr();
+  document.getElementById('sal-date').value = date;
   const resp = document.getElementById('sal-resp').value.trim();
   const ot = document.getElementById('sal-ot').value.trim();
   const activity = document.getElementById('sal-act').value.trim();
@@ -6868,7 +6861,13 @@ function renderHistorial(){
           ? `<span class="tag" style="background:#CCFBF1;color:#0F766E;border-color:#5EEAD4">↩ Devolución</span>`
           : `<span class="tag ${r.type}">${r.type}</span>`);
     return `<tr>
-      <td>${escHtml(fmtDateTime(r.timestamp))}<br><small style="color:var(--muted)">${escHtml(fmtDate(r.date))}</small></td>
+      <td>${escHtml(fmtDateTime(r.timestamp))}${(() => {
+        const tsDate = (r.timestamp||'').slice(0,10);
+        if(r.date && r.date !== tsDate){
+          return `<br><small style="color:#B45309" title="Fecha del movimiento (distinta de registro)">📅 ${escHtml(fmtDate(r.date))}</small>`;
+        }
+        return '';
+      })()}</td>
       <td>${typeTag}</td>
       <td>${escHtml(r.material)}</td>
       <td class="sap">${escHtml(r.sap ?? '—')}</td>
