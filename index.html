@@ -2798,9 +2798,20 @@ function saveState(opts){
 
 // ---------- UTIL ----------
 function todayStr(){
-  const d = new Date();
-  const z = n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;
+  // Zona horaria Chile forzada, independiente de la del dispositivo.
+  // Usa Intl para convertir el instante UTC actual al día calendario en Chile.
+  try {
+    const fmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Santiago',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    });
+    return fmt.format(new Date());  // YYYY-MM-DD
+  } catch(e) {
+    // Fallback si Intl falla
+    const d = new Date();
+    const z = n=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;
+  }
 }
 function fmtDateTime(iso){
   const d = new Date(iso);
@@ -5474,23 +5485,19 @@ let dashPeriod = 'week';
 const PERIOD_LABEL = {day:'Hoy', week:'esta semana', month:'este mes', '3m':'últimos 3 meses', all:'histórico total'};
 
 function getPeriodRange(period){
-  const now = new Date();
-  const z = n=>String(n).padStart(2,'0');
-  const fmt = d => `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;
-  const today = fmt(now);
+  // Zona horaria Chile forzada (no depende del dispositivo)
+  const today = todayStr();   // YYYY-MM-DD en zona Chile
+  const shift = (yyyymmdd, days) => {
+    const [y, m, d] = yyyymmdd.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m-1, d));
+    dt.setUTCDate(dt.getUTCDate() + days);
+    const z = n => String(n).padStart(2,'0');
+    return `${dt.getUTCFullYear()}-${z(dt.getUTCMonth()+1)}-${z(dt.getUTCDate())}`;
+  };
   if(period==='day') return {from: today, to: today, days: 1};
-  if(period==='week'){
-    const d = new Date(now); d.setDate(d.getDate()-6);
-    return {from: fmt(d), to: today, days: 7};
-  }
-  if(period==='month'){
-    const d = new Date(now); d.setDate(d.getDate()-29);
-    return {from: fmt(d), to: today, days: 30};
-  }
-  if(period==='3m'){
-    const d = new Date(now); d.setDate(d.getDate()-89);
-    return {from: fmt(d), to: today, days: 90};
-  }
+  if(period==='week')  return {from: shift(today, -6),  to: today, days: 7};
+  if(period==='month') return {from: shift(today, -29), to: today, days: 30};
+  if(period==='3m')    return {from: shift(today, -89), to: today, days: 90};
   if(state.movements.length){
     const earliest = state.movements.reduce((min,m)=> m.date < min ? m.date : min, state.movements[0].date);
     const d1 = new Date(earliest), d2 = new Date(today);
