@@ -6868,13 +6868,7 @@ function renderHistorial(){
           ? `<span class="tag" style="background:#CCFBF1;color:#0F766E;border-color:#5EEAD4">↩ Devolución</span>`
           : `<span class="tag ${r.type}">${r.type}</span>`);
     return `<tr>
-      <td>${escHtml(fmtDateTime(r.timestamp))}${(() => {
-        const tsDate = (r.timestamp||'').slice(0,10);
-        if(r.date && r.date !== tsDate){
-          return `<br><small style="color:#B45309" title="Fecha del movimiento (distinta de registro)">📅 ${escHtml(fmtDate(r.date))}</small>`;
-        }
-        return '';
-      })()}</td>
+      <td>${escHtml(fmtDateTime(r.timestamp))}</td>
       <td>${typeTag}</td>
       <td>${escHtml(r.material)}</td>
       <td class="sap">${escHtml(r.sap ?? '—')}</td>
